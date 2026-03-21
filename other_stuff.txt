@@ -1,0 +1,4 @@
+
+// Use this calibration code in setup():
+  uint16_t calData[5] = { 249, 3661, 86, 3625, 7 };
+  tft.setTouch(calData);
