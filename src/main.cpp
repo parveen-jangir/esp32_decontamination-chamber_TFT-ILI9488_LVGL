@@ -1,143 +1,151 @@
-#include <lvgl.h>
-#include <TFT_eSPI.h>
+#include <Arduino.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
+#include "config.h"
 
-TFT_eSPI tft = TFT_eSPI();
+// ==================== GLOBAL VARIABLES ====================
+const uint8_t buttonPins[MAX_CHANNELS] = {CH1_PUSH_BTN, CH2_PUSH_BTN, CH3_PUSH_BTN};
+const uint8_t sensorPins[MAX_CHANNELS] = {CH1_SENSOR, CH2_SENSOR, CH3_SENSOR};
+bool processing = false; // state of system (true = processing, false = idle)
 
-// Buffer
-static lv_disp_draw_buf_t draw_buf;
-static lv_color_t buf[480 * 20];
+// =============== PUSH BUTTONS ===============
 
-// Label pointer (global for update)
-lv_obj_t * slider_label;
+QueueHandle_t queueGroup1;
 
-/* ================= DISPLAY FLUSH ================= */
-void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p)
+#define CREATE_ISR_GROUP1(btn)                      \
+  void IRAM_ATTR button##btn##_isr()                \
+  {                                                 \
+    static unsigned long lastTime = 0;              \
+    unsigned long now = millis();                   \
+    if (now - lastTime > 200)                       \
+    {                                               \
+      int btnID = btn;                              \
+      xQueueSendFromISR(queueGroup1, &btnID, NULL); \
+      lastTime = now;                               \
+    }                                               \
+  }
+
+CREATE_ISR_GROUP1(0)
+CREATE_ISR_GROUP1(1)
+CREATE_ISR_GROUP1(2)
+
+// =============== SENSOR BUTTONS ===============
+
+QueueHandle_t queueGroup2;
+
+#define CREATE_ISR_GROUP2(btn)                      \
+  void IRAM_ATTR button##btn##_isr()                \
+  {                                                 \
+    static unsigned long lastTime = 0;              \
+    unsigned long now = millis();                   \
+    if (now - lastTime > 200)                       \
+    {                                               \
+      int btnID = btn;                              \
+      xQueueSendFromISR(queueGroup2, &btnID, NULL); \
+      lastTime = now;                               \
+    }                                               \
+  }
+
+CREATE_ISR_GROUP2(3)
+CREATE_ISR_GROUP2(4)
+CREATE_ISR_GROUP2(5)
+
+// ==================== TASK 1 - Handles only Group 1 ====================
+void buttonTaskGroup1(void *pvParameters)
 {
-    uint32_t w = (area->x2 - area->x1 + 1);
-    uint32_t h = (area->y2 - area->y1 + 1);
+  int btnID;
+  while (true)
+  {
+    if (xQueueReceive(queueGroup1, &btnID, portMAX_DELAY))
+    {
+      Serial.printf("🚀 [Group 1] Button %d PRESSED!\n", btnID);
 
-    tft.startWrite();
-    tft.setAddrWindow(area->x1, area->y1, w, h);
-    tft.pushColors((uint16_t *)&color_p->full, w * h, true);
-    tft.endWrite();
-
-    lv_disp_flush_ready(disp);
-}
-
-/* ================= EVENTS ================= */
-
-// Button event
-static void btn_event_cb(lv_event_t * e)
-{
-    if(lv_event_get_code(e) == LV_EVENT_CLICKED) {
-        Serial.println("Button Pressed!");
+      // ← Put your Group 1 actions here
+      switch (btnID)
+      {
+      case 0:
+        Serial.println("   → Action for Group1 Button 0");
+        break;
+      case 1:
+        Serial.println("   → Action for Group1 Button 1");
+        break;
+      case 2:
+        Serial.println("   → Action for Group1 Button 2");
+        break;
+      }
     }
+  }
 }
 
-// Slider event
-static void slider_event_cb(lv_event_t * e)
+// ==================== TASK 2 - Handles only Group 2 ====================
+void buttonTaskGroup2(void *pvParameters)
 {
-    lv_obj_t * slider = lv_event_get_target(e);
-    int value = lv_slider_get_value(slider);
+  int btnID;
+  while (true)
+  {
+    if (xQueueReceive(queueGroup2, &btnID, portMAX_DELAY))
+    {
+      Serial.printf("🚀 [Group 2] Button %d PRESSED!\n", btnID);
 
-    char buf[20];
-    sprintf(buf, "Value: %d", value);
-    lv_label_set_text(slider_label, buf);
-}
-
-/* ================= UI ================= */
-
-void ui_init()
-{
-    // Title
-    lv_obj_t * title = lv_label_create(lv_scr_act());
-    lv_label_set_text(title, "LVGL Demo UI");
-    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 10);
-
-    // Button
-    lv_obj_t * btn = lv_btn_create(lv_scr_act());
-    lv_obj_set_size(btn, 120, 50);
-    lv_obj_align(btn, LV_ALIGN_CENTER, 0, -40);
-    lv_obj_add_event_cb(btn, btn_event_cb, LV_EVENT_CLICKED, NULL);
-
-    lv_obj_t * btn_label = lv_label_create(btn);
-    lv_label_set_text(btn_label, "Press Me");
-    lv_obj_center(btn_label);
-
-    // Slider
-    lv_obj_t * slider = lv_slider_create(lv_scr_act());
-    lv_obj_set_width(slider, 300);
-    lv_obj_align(slider, LV_ALIGN_CENTER, 0, 40);
-    lv_slider_set_range(slider, 0, 100);
-    lv_obj_add_event_cb(slider, slider_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
-
-    // Slider value label
-    slider_label = lv_label_create(lv_scr_act());
-    lv_label_set_text(slider_label, "Value: 0");
-    lv_obj_align(slider_label, LV_ALIGN_CENTER, 0, 80);
-}
-
-void my_touch_read(lv_indev_drv_t * indev, lv_indev_data_t * data)
-{
-    uint16_t touchX, touchY;
-
-    bool touched = tft.getTouch(&touchX, &touchY);
-
-    if (!touched) {
-        data->state = LV_INDEV_STATE_RELEASED;
-    } else {
-        data->state = LV_INDEV_STATE_PRESSED;
-
-        data->point.x = touchX;
-        data->point.y = touchY;
+      // ← Put your Group 2 actions here (completely different from Group 1)
+      switch (btnID)
+      {
+      case 3:
+        Serial.println("   → Action for Group2 Button 3");
+        break;
+      case 4:
+        Serial.println("   → Action for Group2 Button 4");
+        break;
+      case 5:
+        Serial.println("   → Action for Group2 Button 5");
+        break;
+      }
     }
+  }
 }
 
-/* ================= SETUP ================= */
-
+// ==================== SETUP ====================
 void setup()
 {
-    Serial.begin(115200);
+  Serial.begin(115200);
 
-    tft.begin();
-    tft.setRotation(1);   // Keep same rotation as calibration
+  // Create both queues
+  queueGroup1 = xQueueCreate(10, sizeof(int));
+  queueGroup2 = xQueueCreate(10, sizeof(int));
 
-    // 🔴 ADD THIS RIGHT HERE
-    uint16_t calData[5] = { 249, 3661, 86, 3625, 7 };
-    tft.setTouch(calData);
+  // Create both tasks
+  xTaskCreate(buttonTaskGroup1, "Group1Task", 2048, NULL, 10, NULL);
+  xTaskCreate(buttonTaskGroup2, "Group2Task", 2048, NULL, 10, NULL);
 
-    lv_init();
+  attachInterrupt(digitalPinToInterrupt(buttonPins[0]), button0_isr, FALLING);
+  attachInterrupt(digitalPinToInterrupt(buttonPins[1]), button1_isr, FALLING);
+  attachInterrupt(digitalPinToInterrupt(buttonPins[2]), button2_isr, FALLING);
 
-    // Buffer init
-    lv_disp_draw_buf_init(&draw_buf, buf, NULL, 480 * 20);
+  attachInterrupt(digitalPinToInterrupt(sensorPins[0]), button3_isr, FALLING);
+  attachInterrupt(digitalPinToInterrupt(sensorPins[1]), button4_isr, FALLING);
+  attachInterrupt(digitalPinToInterrupt(sensorPins[2]), button5_isr, FALLING);
 
-    // Display driver
-    static lv_disp_drv_t disp_drv;
-    lv_disp_drv_init(&disp_drv);
+  // Configure all pins (external pull-up)
+  for (int i = 0; i < MAX_CHANNELS; i++)
+  {
+    pinMode(buttonPins[i], INPUT);
+    pinMode(sensorPins[i], INPUT);
+  }
+  pinMode(CH1_RED_LED, OUTPUT);
+  pinMode(CH1_GREEN_LED, OUTPUT);
+  pinMode(CH1_LOCK, OUTPUT);
+  pinMode(CH2_RED_LED, OUTPUT);
+  pinMode(CH2_GREEN_LED, OUTPUT);
+  pinMode(CH2_LOCK, OUTPUT);
+  pinMode(CH3_RED_LED, OUTPUT);
+  pinMode(CH3_GREEN_LED, OUTPUT);
+  pinMode(CH3_LOCK, OUTPUT);
 
-    disp_drv.hor_res = 480;
-    disp_drv.ver_res = 320;
-    disp_drv.flush_cb = my_disp_flush;
-    disp_drv.draw_buf = &draw_buf;
-
-    lv_disp_drv_register(&disp_drv);
-
-    // 🔴 ADD TOUCH DRIVER (IMPORTANT)
-    static lv_indev_drv_t indev_drv;
-    lv_indev_drv_init(&indev_drv);
-
-    indev_drv.type = LV_INDEV_TYPE_POINTER;
-    indev_drv.read_cb = my_touch_read;
-
-    lv_indev_drv_register(&indev_drv);
-
-    ui_init();
+  Serial.println("✅ Setup complete.");
 }
-
-/* ================= LOOP ================= */
 
 void loop()
 {
-    lv_timer_handler();
-    delay(5);
+  vTaskDelay(pdMS_TO_TICKS(1000)); // main loop sleeps
 }
