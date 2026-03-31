@@ -98,16 +98,15 @@ void handleModeA_Button(int btnID)
     {
         entryChannel = 1;
         exitChannel = 2;
-        unlockDoor(1);
-        lockDoor(2);
     }
     else if (btnID == 1) // CH2 → Reverse
     {
         entryChannel = 2;
         exitChannel = 1;
-        unlockDoor(entryChannel);
-        lockDoor(exitChannel);
     }
+
+    unlockDoor(entryChannel);
+    lockDoor(exitChannel);
 
     setGreen(entryChannel, true);
     setAux(true);
@@ -134,27 +133,22 @@ void handleModeA_Sensor(int sensorID)
             systemState = PROCESS_RUNNING;
         }
 
-        if (entryChannel == 2 && sensorID == 1 && isDoorClosed(2))
+        if (entryChannel == 2 && sensorID == 1 && isDoorClosed(entryChannel))
         {
-            unlockDoor(1);
+            lockDoor(entryChannel);
+            Serial.println("[INFO] Reverse entry - Starting process in 1 second");
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            unlockDoor(exitChannel);
             systemState = EXIT_OPEN;
         }
     }
 
     if (systemState == WAIT_EXIT_CLOSE)
     {
-        if (entryChannel == 1 && sensorID == 1 && isDoorClosed(2))
+        if (isDoorClosed(exitChannel))
         {
-            lockDoor(2);
+            lockDoor(exitChannel);
             setRed(false);
-            setAux(false);
-            systemState = INIT_CHECK;
-        }
-
-        if (entryChannel == 2 && sensorID == 0 && isDoorClosed(1))
-        {
-            lockDoor(1);
-            lockDoor(2);
             setAux(false);
             systemState = INIT_CHECK;
         }
@@ -301,11 +295,8 @@ void controlTask(void *pv)
             if (isTimeout(SPRAY_DURATION))
             {
                 stopSpray();
-
-                if (entryChannel == 1)
-                {
-                    unlockDoor(2);
-                }
+                unlockDoor(exitChannel);
+        
                 stateStartTime = millis();
                 systemState = EXIT_OPEN;
             }
@@ -314,9 +305,9 @@ void controlTask(void *pv)
         case EXIT_OPEN:
             if (isTimeout(AUTO_RELOCK_TIMEOUT))
             {
-                if (entryChannel == 1 && isDoorClosed(exitChannel))
+                if (isDoorClosed(exitChannel))
                 {
-                    lockDoor(2);
+                    lockDoor(exitChannel);
                 }
                 setAux(false);
                 systemState = INIT_CHECK;
