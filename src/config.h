@@ -100,8 +100,8 @@
 // Button/Sensor Logic (Active-LOW: LOW = pressed/closed, HIGH = released/open)
 #define BUTTON_PRESSED      LOW
 #define BUTTON_RELEASED     HIGH
-#define SENSOR_CLOSED       LOW
-#define SENSOR_OPEN         HIGH
+#define DOOR_CLOSED       LOW
+#define DOOR_OPEN         HIGH
 
 
 // ============================================================================
@@ -120,9 +120,9 @@
 // After emergency triggered, system locks all doors and returns to IDLE
 #define EMERGENCY_TIMEOUT          10000    // 10 seconds
 
-// Exit Window Timeout (MODE C Only)
+// Window Close Timeout
 // Time allowed for users to exit after spray completes before re-locking
-#define EXIT_WINDOW_TIMEOUT        10000    // 10 seconds
+#define WINDOW_CLOSE_TIMEOUT        20000    // 20 seconds
 
 // Button Debounce Delay
 // Button must be stable (LOW) for this duration to register as pressed

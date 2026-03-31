@@ -4,148 +4,412 @@
 #include "freertos/queue.h"
 #include "config.h"
 
-// ==================== GLOBAL VARIABLES ====================
-const uint8_t buttonPins[MAX_CHANNELS] = {CH1_PUSH_BTN, CH2_PUSH_BTN, CH3_PUSH_BTN};
-const uint8_t sensorPins[MAX_CHANNELS] = {CH1_SENSOR, CH2_SENSOR, CH3_SENSOR};
-bool processing = false; // state of system (true = processing, false = idle)
+// ==================== MODE ====================
+volatile int current_mode = DEFAULT_MODE;
 
-// =============== PUSH BUTTONS ===============
-
-QueueHandle_t queueGroup1;
-
-#define CREATE_ISR_GROUP1(btn)                      \
-  void IRAM_ATTR button##btn##_isr()                \
-  {                                                 \
-    static unsigned long lastTime = 0;              \
-    unsigned long now = millis();                   \
-    if (now - lastTime > 200)                       \
-    {                                               \
-      int btnID = btn;                              \
-      xQueueSendFromISR(queueGroup1, &btnID, NULL); \
-      lastTime = now;                               \
-    }                                               \
-  }
-
-CREATE_ISR_GROUP1(0)
-CREATE_ISR_GROUP1(1)
-CREATE_ISR_GROUP1(2)
-
-// =============== SENSOR BUTTONS ===============
-
-QueueHandle_t queueGroup2;
-
-#define CREATE_ISR_GROUP2(btn)                      \
-  void IRAM_ATTR button##btn##_isr()                \
-  {                                                 \
-    static unsigned long lastTime = 0;              \
-    unsigned long now = millis();                   \
-    if (now - lastTime > 200)                       \
-    {                                               \
-      int btnID = btn;                              \
-      xQueueSendFromISR(queueGroup2, &btnID, NULL); \
-      lastTime = now;                               \
-    }                                               \
-  }
-
-CREATE_ISR_GROUP2(3)
-CREATE_ISR_GROUP2(4)
-CREATE_ISR_GROUP2(5)
-
-// ==================== TASK 1 - Handles only Group 1 ====================
-void buttonTaskGroup1(void *pvParameters)
+// ==================== STATE ====================
+typedef enum
 {
-  int btnID;
-  while (true)
-  {
-    if (xQueueReceive(queueGroup1, &btnID, portMAX_DELAY))
-    {
-      Serial.printf("🚀 [Group 1] Button %d PRESSED!\n", btnID);
+    INIT_CHECK,
+    IDLE,
 
-      // ← Put your Group 1 actions here
-      switch (btnID)
-      {
-      case 0:
-        Serial.println("   → Action for Group1 Button 0");
-        break;
-      case 1:
-        Serial.println("   → Action for Group1 Button 1");
-        break;
-      case 2:
-        Serial.println("   → Action for Group1 Button 2");
-        break;
-      }
-    }
-  }
+    ENTRY_OPEN,
+    WAIT_ENTRY_CLOSE,
+    PROCESS_RUNNING,
+    EXIT_OPEN,
+    WAIT_EXIT_CLOSE,
+
+    WARNING_TIMEOUT,
+    EMERGENCY_STATE,
+    SYSTEM_FAILURE
+
+} SystemState;
+
+volatile SystemState systemState = INIT_CHECK;
+
+// ==================== CONTEXT ====================
+uint8_t entryChannel = 0; // 1 or 2
+uint8_t exitChannel = 0;  // 1 or 2 (opposite of entryChannel)
+unsigned long stateStartTime = 0;
+
+// ==================== QUEUES ====================
+QueueHandle_t queueButtons;
+QueueHandle_t queueSensors;
+
+// ==================== HELPERS ====================
+bool isTimeout(unsigned long t)
+{
+    return millis() - stateStartTime >= t;
 }
 
-// ==================== TASK 2 - Handles only Group 2 ====================
-void buttonTaskGroup2(void *pvParameters)
+// Door and lock control functions
+bool isDoorClosed(int ch)
 {
-  int btnID;
-  while (true)
-  {
-    if (xQueueReceive(queueGroup2, &btnID, portMAX_DELAY))
-    {
-      Serial.printf("🚀 [Group 2] Button %d PRESSED!\n", btnID);
+    if (ch == 1) return digitalRead(CH1_SENSOR) == DOOR_CLOSED;
+    if (ch == 2) return digitalRead(CH2_SENSOR) == DOOR_CLOSED;
+    return false;
+}
 
-      // ← Put your Group 2 actions here (completely different from Group 1)
-      switch (btnID)
-      {
-      case 3:
-        Serial.println("   → Action for Group2 Button 3");
-        break;
-      case 4:
-        Serial.println("   → Action for Group2 Button 4");
-        break;
-      case 5:
-        Serial.println("   → Action for Group2 Button 5");
-        break;
-      }
+void lockDoor(int ch)
+{
+    if (ch == 1) digitalWrite(CH1_LOCK, RELAY_LOCK);
+    if (ch == 2) digitalWrite(CH2_LOCK, RELAY_LOCK);
+}
+
+void unlockDoor(int ch)
+{
+    if (ch == 1) digitalWrite(CH1_LOCK, RELAY_UNLOCK);
+    if (ch == 2) digitalWrite(CH2_LOCK, RELAY_UNLOCK);
+}
+
+void startSpray() { digitalWrite(RELAY4_SPRAY_PIN, RELAY_SPRAY_ON); }
+void stopSpray()  { digitalWrite(RELAY4_SPRAY_PIN, RELAY_SPRAY_OFF); }
+
+// ==================== LED + AUX ====================
+void setGreen(int ch, bool state)
+{
+    if (ch == 1) digitalWrite(CH1_GREEN_LED, state);
+    if (ch == 2) digitalWrite(CH2_GREEN_LED, state);
+}
+
+void setRed(bool state)
+{
+    digitalWrite(CH1_RED_LED, state); // shared
+}
+
+void setAux(bool state)
+{
+    digitalWrite(AUX_LIGHT_PIN, state);
+}
+
+// ==================== ISR ====================
+void IRAM_ATTR button0_isr(){ int id=0; xQueueSendFromISR(queueButtons,&id,NULL); }
+void IRAM_ATTR button1_isr(){ int id=1; xQueueSendFromISR(queueButtons,&id,NULL); }
+
+void IRAM_ATTR sensor0_isr(){ int id=0; xQueueSendFromISR(queueSensors,&id,NULL); }
+void IRAM_ATTR sensor1_isr(){ int id=1; xQueueSendFromISR(queueSensors,&id,NULL); }
+
+// ==================== BUTTON HANDLER ====================
+void handleModeA_Button(int btnID)
+{
+    if (systemState != IDLE) return;
+
+    if (btnID == 0) // CH1 → Forward
+    {
+        entryChannel = 1;
+        exitChannel = 2;
+        unlockDoor(1);
+        lockDoor(2);
     }
-  }
+    else if (btnID == 1) // CH2 → Reverse
+    {
+        entryChannel = 2;
+        exitChannel = 1;
+        unlockDoor(entryChannel);
+        lockDoor(exitChannel);
+    }
+
+    setGreen(entryChannel, true);
+    setAux(true);
+
+    systemState = ENTRY_OPEN;
+    stateStartTime = millis();
+}
+
+// ==================== SENSOR HANDLER ====================
+void handleModeA_Sensor(int sensorID)
+{
+    if (systemState == WAIT_ENTRY_CLOSE)
+    {
+        if (entryChannel == 1 && sensorID == 0 && isDoorClosed(entryChannel))
+        {
+            lockDoor(entryChannel);
+            Serial.println("[INFO] Forward entry - Starting process in 1 second");
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            startSpray();
+            setRed(true);
+            setGreen(1, false);
+
+            stateStartTime = millis();
+            systemState = PROCESS_RUNNING;
+        }
+
+        if (entryChannel == 2 && sensorID == 1 && isDoorClosed(2))
+        {
+            unlockDoor(1);
+            systemState = EXIT_OPEN;
+        }
+    }
+
+    if (systemState == WAIT_EXIT_CLOSE)
+    {
+        if (entryChannel == 1 && sensorID == 1 && isDoorClosed(2))
+        {
+            lockDoor(2);
+            setRed(false);
+            setAux(false);
+            systemState = INIT_CHECK;
+        }
+
+        if (entryChannel == 2 && sensorID == 0 && isDoorClosed(1))
+        {
+            lockDoor(1);
+            lockDoor(2);
+            setAux(false);
+            systemState = INIT_CHECK;
+        }
+    }
+}
+
+// ==================== WARNING ====================
+void handleWarning()
+{
+    static bool blink=false;
+    static unsigned long t=0;
+
+    if (millis()-t>500)
+    {
+        t=millis();
+        blink=!blink;
+        setRed(blink);
+    }
+
+    setAux(true);
+
+    if (isDoorClosed(1) && isDoorClosed(2))
+    {
+        setRed(false);
+        systemState = IDLE;
+    }
+}
+
+// ==================== EMERGENCY ====================
+void handleEmergency()
+{
+    stopSpray();
+    lockDoor(1);
+    lockDoor(2);
+
+    static bool blink=false;
+    static unsigned long t=0;
+
+    if (millis()-t>300)
+    {
+        t=millis();
+        blink=!blink;
+        setRed(blink);
+        setGreen(1, blink);
+        setGreen(2, blink);
+    }
+
+    setAux(true);
+
+    if (isTimeout(EMERGENCY_TIMEOUT))
+    {
+        if (isDoorClosed(1) && isDoorClosed(2))
+        {
+            setRed(false);
+            setGreen(1,false);
+            setGreen(2,false);
+            setAux(false);
+            systemState = IDLE;
+        }
+    }
+}
+
+// ==================== CONTROL LOGIC ====================
+void controlTask(void *pv)
+{
+    while (true)
+    {
+        // Check states of buttons and sensors
+        bool ch1_sensor = digitalRead(CH1_SENSOR); // true if OPEN
+        bool ch2_sensor = digitalRead(CH2_SENSOR); // true if OPEN
+        bool ch1_button = digitalRead(CH1_PUSH_BTN); // true if NOT pressed (active LOW)
+        bool ch2_button = digitalRead(CH2_PUSH_BTN); // true if NOT pressed (active LOW)
+        bool emergency_btn = digitalRead(EMERGENCY_BTN_PIN); // true if NOT pressed (active LOW)
+
+        // Emergency button
+        if (emergency_btn == BUTTON_PRESSED)
+        {
+            systemState = EMERGENCY_STATE;
+            stateStartTime = millis();
+        }
+
+        // If door opened during processing
+        if (systemState == PROCESS_RUNNING)
+        {
+            if (ch1_sensor == DOOR_OPEN || ch2_sensor == DOOR_OPEN)
+                systemState = SYSTEM_FAILURE;
+        }
+
+        // Both doors should not be open at the same time
+        if (ch1_sensor == DOOR_OPEN && ch2_sensor == DOOR_OPEN)
+        {
+            systemState = SYSTEM_FAILURE;
+        }
+
+        if (ch1_sensor == DOOR_OPEN || ch2_sensor == DOOR_OPEN)
+        {
+            if(systemState == IDLE)
+            {
+                setAux(true);
+                systemState = SYSTEM_FAILURE;
+            }
+        }
+
+        switch (systemState)
+        {
+        case INIT_CHECK:
+            if (ch1_sensor == DOOR_CLOSED && ch2_sensor == DOOR_CLOSED)
+            {
+                lockDoor(1);
+                lockDoor(2);
+                stopSpray();
+                setAux(false);
+                systemState = IDLE;
+            }
+            else
+            {
+                setAux(true);
+                systemState = SYSTEM_FAILURE;
+            }
+            break;
+
+        case ENTRY_OPEN:
+
+            // Timeout completed still door is closed
+            if (isTimeout(AUTO_RELOCK_TIMEOUT) && isDoorClosed(entryChannel))
+            {
+                lockDoor(entryChannel);
+                setGreen(entryChannel,false);
+                systemState = INIT_CHECK;
+            }
+
+            // Move to next state if door opens before timeout
+            if (!isDoorClosed(entryChannel))
+            {
+                setGreen(entryChannel,false);
+                stateStartTime = millis();
+                vTaskDelay(pdMS_TO_TICKS(1000)); // Short delay to allow for door state
+                lockDoor(entryChannel);
+                systemState = WAIT_ENTRY_CLOSE;
+            }
+            break;
+
+        case PROCESS_RUNNING:
+            if (isTimeout(SPRAY_DURATION))
+            {
+                stopSpray();
+
+                if (entryChannel == 1)
+                {
+                    unlockDoor(2);
+                }
+                stateStartTime = millis();
+                systemState = EXIT_OPEN;
+            }
+            break;
+
+        case EXIT_OPEN:
+            if (isTimeout(AUTO_RELOCK_TIMEOUT))
+            {
+                if (entryChannel == 1 && isDoorClosed(exitChannel))
+                {
+                    lockDoor(2);
+                }
+                setAux(false);
+                systemState = INIT_CHECK;
+            }
+
+            if (!isDoorClosed(exitChannel))
+            {
+                stateStartTime = millis();
+                systemState = WAIT_EXIT_CLOSE;
+            }
+            break;
+
+        case WARNING_TIMEOUT:
+            handleWarning();
+            break;
+
+        case EMERGENCY_STATE:
+            handleEmergency();
+            break;
+
+        case SYSTEM_FAILURE:
+            setRed(true);
+
+        default:
+            break;
+        }
+    }
+}
+
+// ==================== TASKS ====================
+void buttonTask(void *pv)
+{
+    int id;
+    while (true)
+    {
+        if (xQueueReceive(queueButtons,&id,portMAX_DELAY))
+        {
+            if (current_mode == MODE_A)
+                handleModeA_Button(id);
+        }
+    }
+}
+
+void sensorTask(void *pv)
+{
+    int id;
+    while (true)
+    {
+        if (xQueueReceive(queueSensors,&id,portMAX_DELAY))
+        {
+            if (current_mode == MODE_A)
+                handleModeA_Sensor(id);
+        }
+    }
 }
 
 // ==================== SETUP ====================
 void setup()
 {
-  Serial.begin(115200);
+    Serial.begin(SERIAL_BAUD);
 
-  // Create both queues
-  queueGroup1 = xQueueCreate(10, sizeof(int));
-  queueGroup2 = xQueueCreate(10, sizeof(int));
+    queueButtons = xQueueCreate(10,sizeof(int));
+    queueSensors = xQueueCreate(10,sizeof(int));
 
-  // Create both tasks
-  xTaskCreate(buttonTaskGroup1, "Group1Task", 2048, NULL, 10, NULL);
-  xTaskCreate(buttonTaskGroup2, "Group2Task", 2048, NULL, 10, NULL);
+    pinMode(CH1_LOCK,OUTPUT);
+    pinMode(CH2_LOCK,OUTPUT);
+    pinMode(RELAY4_SPRAY_PIN,OUTPUT);
+    pinMode(AUX_LIGHT_PIN,OUTPUT);
 
-  attachInterrupt(digitalPinToInterrupt(buttonPins[0]), button0_isr, FALLING);
-  attachInterrupt(digitalPinToInterrupt(buttonPins[1]), button1_isr, FALLING);
-  attachInterrupt(digitalPinToInterrupt(buttonPins[2]), button2_isr, FALLING);
+    pinMode(CH1_PUSH_BTN,INPUT);
+    pinMode(CH2_PUSH_BTN,INPUT);
+    pinMode(CH1_SENSOR,INPUT);
+    pinMode(CH2_SENSOR,INPUT);
+    pinMode(EMERGENCY_BTN_PIN,INPUT);
 
-  attachInterrupt(digitalPinToInterrupt(sensorPins[0]), button3_isr, FALLING);
-  attachInterrupt(digitalPinToInterrupt(sensorPins[1]), button4_isr, FALLING);
-  attachInterrupt(digitalPinToInterrupt(sensorPins[2]), button5_isr, FALLING);
+    pinMode(CH1_GREEN_LED,OUTPUT);
+    pinMode(CH2_GREEN_LED,OUTPUT);
+    pinMode(CH1_RED_LED,OUTPUT);
 
-  // Configure all pins (external pull-up)
-  for (int i = 0; i < MAX_CHANNELS; i++)
-  {
-    pinMode(buttonPins[i], INPUT);
-    pinMode(sensorPins[i], INPUT);
-  }
-  pinMode(CH1_RED_LED, OUTPUT);
-  pinMode(CH1_GREEN_LED, OUTPUT);
-  pinMode(CH1_LOCK, OUTPUT);
-  pinMode(CH2_RED_LED, OUTPUT);
-  pinMode(CH2_GREEN_LED, OUTPUT);
-  pinMode(CH2_LOCK, OUTPUT);
-  pinMode(CH3_RED_LED, OUTPUT);
-  pinMode(CH3_GREEN_LED, OUTPUT);
-  pinMode(CH3_LOCK, OUTPUT);
+    attachInterrupt(digitalPinToInterrupt(CH1_PUSH_BTN),button0_isr,FALLING);
+    attachInterrupt(digitalPinToInterrupt(CH2_PUSH_BTN),button1_isr,FALLING);
 
-  Serial.println("✅ Setup complete.");
+    attachInterrupt(digitalPinToInterrupt(CH1_SENSOR),sensor0_isr,FALLING);
+    attachInterrupt(digitalPinToInterrupt(CH2_SENSOR),sensor1_isr,FALLING);
+
+    xTaskCreate(buttonTask,"btn",2048,NULL,10,NULL);
+    xTaskCreate(sensorTask,"sen",2048,NULL,10,NULL);
+    xTaskCreate(controlTask,"ctrl",4096,NULL,10,NULL);
+
+    Serial.println("✅ SYSTEM READY (MODE A)");
 }
 
 void loop()
 {
-  vTaskDelay(pdMS_TO_TICKS(1000)); // main loop sleeps
+    vTaskDelay(pdMS_TO_TICKS(1000));
 }
