@@ -5,7 +5,7 @@
 #include "config.h"
 
 // ==================== MODE ====================
-volatile int current_mode = DEFAULT_MODE;
+volatile int current_mode = MODE_B;
 
 // ==================== STATE ====================
 typedef enum
@@ -90,7 +90,7 @@ void IRAM_ATTR sensor0_isr(){ int id=0; xQueueSendFromISR(queueSensors,&id,NULL)
 void IRAM_ATTR sensor1_isr(){ int id=1; xQueueSendFromISR(queueSensors,&id,NULL); }
 
 // ==================== BUTTON HANDLER ====================
-void handleModeA_Button(int btnID)
+void handleModeAB_Button(int btnID)
 {
     if (systemState != IDLE) return;
 
@@ -118,7 +118,7 @@ void handleModeA_Button(int btnID)
 }
 
 // ==================== SENSOR HANDLER ====================
-void handleModeA_Sensor(int sensorID)
+void handleModeAB_Sensor(int sensorID)
 {
     if (systemState == WAIT_ENTRY_CLOSE)
     {
@@ -127,10 +127,10 @@ void handleModeA_Sensor(int sensorID)
             if (isDoorClosed(entryChannel))
             {
                 lockDoor(entryChannel);
-                setRed(true);
-                setGreen(entryChannel, false);
                 Serial.println(F("[INFO] Entry door closed - Starting process in 1 second"));
                 vTaskDelay(pdMS_TO_TICKS(1000));
+                setRed(true);
+                setGreen(entryChannel, false);
                 startSpray();
 
                 stateStartTime = millis();
@@ -431,8 +431,8 @@ void buttonTask(void *pv)
     {
         if (xQueueReceive(queueButtons,&id,portMAX_DELAY))
         {
-            if (current_mode == MODE_A)
-                handleModeA_Button(id);
+            if (current_mode == MODE_A || current_mode == MODE_B)
+                handleModeAB_Button(id);
         }
     }
 }
@@ -444,8 +444,8 @@ void sensorTask(void *pv)
     {
         if (xQueueReceive(queueSensors,&id,portMAX_DELAY))
         {
-            if (current_mode == MODE_A)
-                handleModeA_Sensor(id);
+            if (current_mode == MODE_A || current_mode == MODE_B)
+                handleModeAB_Sensor(id);
         }
     }
 }
