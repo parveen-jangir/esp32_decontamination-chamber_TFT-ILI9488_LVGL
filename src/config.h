@@ -124,6 +124,10 @@
 // Time allowed for users to exit after spray completes before re-locking
 #define WINDOW_CLOSE_TIMEOUT        20000    // 20 seconds
 
+// System Failure Timeout
+// After critical failure (e.g. door opened during spray), system locks all doors and returns to IDLE
+#define SYSTEM_FAILURE_TIMEOUT      3000    // 3 seconds
+
 // Button Debounce Delay
 // Button must be stable (LOW) for this duration to register as pressed
 #define BTN_DEBOUNCE_TIME          150       // 50 milliseconds
