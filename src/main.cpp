@@ -4,6 +4,9 @@
 #include "freertos/queue.h"
 #include "config.h"
 
+// ==================== Manual & Speed Door Modes ====================
+volatile bool isSpeedDoor = false;
+
 // ==================== MODE ====================
 volatile int current_mode = MODE_B;
 
@@ -239,7 +242,7 @@ void handleSystemFailure()
     {
         t=millis();
         blink=!blink;
-        setRed(blink);
+        setRed(!blink);
         setGreen(1, blink);
         setGreen(2, blink);
         setAux(true);
@@ -361,7 +364,19 @@ void controlTask(void *pv)
             break;
 
         case WAIT_ENTRY_CLOSE:
+            if (isSpeedDoor && isTimeout(SPEED_DOOR_TIMEOUT))
+            {
+                lockDoor(entryChannel);
+            }
+
             handleGreenLED(500, entryChannel);
+            break;
+        
+        case WAIT_EXIT_CLOSE:
+            if (isSpeedDoor && isTimeout(SPEED_DOOR_TIMEOUT))
+            {
+                lockDoor(entryChannel);
+            }
             break;
 
         case PROCESS_RUNNING:
@@ -483,10 +498,35 @@ void setup()
     xTaskCreate(sensorTask,"sen",2048,NULL,10,NULL);
     xTaskCreate(controlTask,"ctrl",4096,NULL,10,NULL);
 
-    Serial.println("✅ SYSTEM READY (MODE A)");
+    Serial.println("[INFO] SYSTEM READY (MODE A), Door type: " + String(isSpeedDoor ? "SPEED" : "MANUAL"));
 }
 
 void loop()
 {
+    if(Serial.available())
+    {
+        char cmd = Serial.read();
+        if (cmd == 'a' || cmd == 'A')
+        {
+            current_mode = MODE_A;
+            Serial.println("[Serial] Switched to MODE A");
+        }
+        else if (cmd == 'b' || cmd == 'B')
+        {
+            current_mode = MODE_B;
+            Serial.println("[Serial] Switched to MODE B");
+        }
+        else if (cmd == 'c' || cmd == 'C')
+        {
+            current_mode = MODE_C;
+            Serial.println("[Serial] Switched to MODE C");
+        }
+        else if (cmd == 's' || cmd == 'S')
+        {
+            isSpeedDoor = !isSpeedDoor;
+            Serial.print("[Serial] Speed Door Mode: ");
+            Serial.println(isSpeedDoor ? "ON" : "OFF");
+        }
+    }
     vTaskDelay(pdMS_TO_TICKS(1000));
 }

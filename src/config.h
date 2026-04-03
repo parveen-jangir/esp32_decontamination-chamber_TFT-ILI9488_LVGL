@@ -126,7 +126,10 @@
 
 // System Failure Timeout
 // After critical failure (e.g. door opened during spray), system locks all doors and returns to IDLE
-#define SYSTEM_FAILURE_TIMEOUT      3000    // 3 seconds
+#define SYSTEM_FAILURE_TIMEOUT      1500    // 1.5 seconds
+
+// Speed Door Timeout
+#define SPEED_DOOR_TIMEOUT          3000    // 3 seconds
 
 // Button Debounce Delay
 // Button must be stable (LOW) for this duration to register as pressed
