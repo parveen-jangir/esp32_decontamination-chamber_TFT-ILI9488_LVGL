@@ -157,7 +157,7 @@
 #define DEBUG_LOGIC_OPERATIONS     1
 
 // Enable/Disable Serial Debug Output for Button/Sensor debouncing
-#define DEBUG_DEBOUNCE_OPERATIONS  0  // Set to 1 for detailed debounce logs
+#define DEBUG_DEBOUNCE_OPERATIONS  1  // Set to 1 for detailed debounce logs
 
 // Enable/Disable Serial command interface for mode switching
 #define ENABLE_SERIAL_MODE_SELECT  1  // Set to 0 if using TFT only

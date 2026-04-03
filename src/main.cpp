@@ -39,6 +39,19 @@ unsigned long stateStartTime = 0;
 QueueHandle_t queueButtons;
 QueueHandle_t queueSensors;
 
+// ==================== DEBOUNCE VARIABLES ====================
+// Button debounce state
+volatile unsigned long ch1_button_last_time = 0;
+volatile unsigned long ch2_button_last_time = 0;
+volatile bool ch1_button_pressed = false;
+volatile bool ch2_button_pressed = false;
+
+// Sensor debounce state
+volatile unsigned long ch1_sensor_last_time = 0;
+volatile unsigned long ch2_sensor_last_time = 0;
+volatile bool ch1_sensor_closed = false;
+volatile bool ch2_sensor_closed = false;
+
 // ==================== HELPERS ====================
 bool isTimeout(unsigned long t)
 {
@@ -48,8 +61,8 @@ bool isTimeout(unsigned long t)
 // Door and lock control functions
 bool isDoorClosed(int ch)
 {
-    if (ch == 1) return digitalRead(CH1_SENSOR) == DOOR_CLOSED;
-    if (ch == 2) return digitalRead(CH2_SENSOR) == DOOR_CLOSED;
+    if (ch == 1) return ch1_sensor_closed;  // Use debounced state
+    if (ch == 2) return ch2_sensor_closed;  // Use debounced state
     return false;
 }
 
@@ -85,12 +98,126 @@ void setAux(bool state)
     digitalWrite(AUX_LIGHT_PIN, state);
 }
 
-// ==================== ISR ====================
-void IRAM_ATTR button0_isr(){ int id=0; xQueueSendFromISR(queueButtons,&id,NULL); }
-void IRAM_ATTR button1_isr(){ int id=1; xQueueSendFromISR(queueButtons,&id,NULL); }
-
-void IRAM_ATTR sensor0_isr(){ int id=0; xQueueSendFromISR(queueSensors,&id,NULL); }
-void IRAM_ATTR sensor1_isr(){ int id=1; xQueueSendFromISR(queueSensors,&id,NULL); }
+// ==================== DEBOUNCE TASK ====================
+void debounceTask(void *pv)
+{
+    while (true)
+    {
+        unsigned long current_time = millis();
+        
+        // ----- BUTTON DEBOUNCE -----
+        // CH1 Button
+        bool ch1_raw = digitalRead(CH1_PUSH_BTN);
+        if (ch1_raw == BUTTON_PRESSED && !ch1_button_pressed)
+        {
+            if (current_time - ch1_button_last_time >= BTN_DEBOUNCE_TIME)
+            {
+                ch1_button_pressed = true;
+                ch1_button_last_time = current_time;
+                int id = 0;
+                xQueueSend(queueButtons, &id, 0);
+                #if DEBUG_DEBOUNCE_OPERATIONS
+                Serial.println(F("[DEBOUNCE] CH1 Button PRESSED (debounced)"));
+                #endif
+            }
+        }
+        else if (ch1_raw == BUTTON_RELEASED && ch1_button_pressed)
+        {
+            if (current_time - ch1_button_last_time >= BTN_DEBOUNCE_TIME)
+            {
+                ch1_button_pressed = false;
+                ch1_button_last_time = current_time;
+                #if DEBUG_DEBOUNCE_OPERATIONS
+                Serial.println(F("[DEBOUNCE] CH1 Button RELEASED (debounced)"));
+                #endif
+            }
+        }
+        
+        // CH2 Button
+        bool ch2_raw = digitalRead(CH2_PUSH_BTN);
+        if (ch2_raw == BUTTON_PRESSED && !ch2_button_pressed)
+        {
+            if (current_time - ch2_button_last_time >= BTN_DEBOUNCE_TIME)
+            {
+                ch2_button_pressed = true;
+                ch2_button_last_time = current_time;
+                int id = 1;
+                xQueueSend(queueButtons, &id, 0);
+                #if DEBUG_DEBOUNCE_OPERATIONS
+                Serial.println(F("[DEBOUNCE] CH2 Button PRESSED (debounced)"));
+                #endif
+            }
+        }
+        else if (ch2_raw == BUTTON_RELEASED && ch2_button_pressed)
+        {
+            if (current_time - ch2_button_last_time >= BTN_DEBOUNCE_TIME)
+            {
+                ch2_button_pressed = false;
+                ch2_button_last_time = current_time;
+                #if DEBUG_DEBOUNCE_OPERATIONS
+                Serial.println(F("[DEBOUNCE] CH2 Button RELEASED (debounced)"));
+                #endif
+            }
+        }
+        
+        // ----- SENSOR DEBOUNCE -----
+        // CH1 Sensor
+        bool ch1_sensor_raw = digitalRead(CH1_SENSOR);
+        if (ch1_sensor_raw == DOOR_CLOSED && !ch1_sensor_closed)
+        {
+            if (current_time - ch1_sensor_last_time >= SENSOR_DEBOUNCE_TIME)
+            {
+                ch1_sensor_closed = true;
+                ch1_sensor_last_time = current_time;
+                int id = 0;
+                xQueueSend(queueSensors, &id, 0);
+                #if DEBUG_DEBOUNCE_OPERATIONS
+                Serial.println(F("[DEBOUNCE] CH1 Sensor CLOSED (debounced)"));
+                #endif
+            }
+        }
+        else if (ch1_sensor_raw == DOOR_OPEN && ch1_sensor_closed)
+        {
+            if (current_time - ch1_sensor_last_time >= SENSOR_DEBOUNCE_TIME)
+            {
+                ch1_sensor_closed = false;
+                ch1_sensor_last_time = current_time;
+                #if DEBUG_DEBOUNCE_OPERATIONS
+                Serial.println(F("[DEBOUNCE] CH1 Sensor OPENED (debounced)"));
+                #endif
+            }
+        }
+        
+        // CH2 Sensor
+        bool ch2_sensor_raw = digitalRead(CH2_SENSOR);
+        if (ch2_sensor_raw == DOOR_CLOSED && !ch2_sensor_closed)
+        {
+            if (current_time - ch2_sensor_last_time >= SENSOR_DEBOUNCE_TIME)
+            {
+                ch2_sensor_closed = true;
+                ch2_sensor_last_time = current_time;
+                int id = 1;
+                xQueueSend(queueSensors, &id, 0);
+                #if DEBUG_DEBOUNCE_OPERATIONS
+                Serial.println(F("[DEBOUNCE] CH2 Sensor CLOSED (debounced)"));
+                #endif
+            }
+        }
+        else if (ch2_sensor_raw == DOOR_OPEN && ch2_sensor_closed)
+        {
+            if (current_time - ch2_sensor_last_time >= SENSOR_DEBOUNCE_TIME)
+            {
+                ch2_sensor_closed = false;
+                ch2_sensor_last_time = current_time;
+                #if DEBUG_DEBOUNCE_OPERATIONS
+                Serial.println(F("[DEBOUNCE] CH2 Sensor OPENED (debounced)"));
+                #endif
+            }
+        }
+        
+        vTaskDelay(pdMS_TO_TICKS(5)); // 5ms poll interval
+    }
+}
 
 // ==================== BUTTON HANDLER ====================
 void handleModeAB_Button(int btnID)
@@ -261,14 +388,14 @@ void controlTask(void *pv)
 {
     while (true)
     {
-        // Check states of buttons and sensors
-        bool ch1_sensor = digitalRead(CH1_SENSOR); // true if OPEN
-        bool ch2_sensor = digitalRead(CH2_SENSOR); // true if OPEN
-        bool ch1_button = digitalRead(CH1_PUSH_BTN); // true if NOT pressed (active LOW)
-        bool ch2_button = digitalRead(CH2_PUSH_BTN); // true if NOT pressed (active LOW)
+        // Use debounced states instead of raw reads
+        bool ch1_sensor = !ch1_sensor_closed; // true if OPEN
+        bool ch2_sensor = !ch2_sensor_closed; // true if OPEN
+        bool ch1_button = !ch1_button_pressed; // true if NOT pressed (active LOW)
+        bool ch2_button = !ch2_button_pressed; // true if NOT pressed (active LOW)
         bool emergency_btn = digitalRead(EMERGENCY_BTN_PIN); // true if NOT pressed (active LOW)
 
-        // Emergency button
+        // Emergency button (no debounce - direct for safety)
         if (emergency_btn == BUTTON_PRESSED)
         {
             Serial.println(F("[EMERGENCY] Emergency button pressed"));
@@ -375,7 +502,7 @@ void controlTask(void *pv)
         case WAIT_EXIT_CLOSE:
             if (isSpeedDoor && isTimeout(SPEED_DOOR_TIMEOUT))
             {
-                lockDoor(entryChannel);
+                lockDoor(exitChannel);  // Fixed: was entryChannel
             }
             break;
 
@@ -478,27 +605,30 @@ void setup()
     pinMode(RELAY4_SPRAY_PIN,OUTPUT);
     pinMode(AUX_LIGHT_PIN,OUTPUT);
 
-    pinMode(CH1_PUSH_BTN,INPUT);
-    pinMode(CH2_PUSH_BTN,INPUT);
-    pinMode(CH1_SENSOR,INPUT);
-    pinMode(CH2_SENSOR,INPUT);
-    pinMode(EMERGENCY_BTN_PIN,INPUT_PULLUP);
+    // Enable internal pull-ups for active-LOW inputs
+    pinMode(CH1_PUSH_BTN, INPUT_PULLUP);
+    pinMode(CH2_PUSH_BTN, INPUT_PULLUP);
+    pinMode(CH1_SENSOR, INPUT_PULLUP);
+    pinMode(CH2_SENSOR, INPUT_PULLUP);
+    pinMode(EMERGENCY_BTN_PIN, INPUT_PULLUP);
 
     pinMode(CH1_GREEN_LED,OUTPUT);
     pinMode(CH2_GREEN_LED,OUTPUT);
     pinMode(CH1_RED_LED,OUTPUT);
 
-    attachInterrupt(digitalPinToInterrupt(CH1_PUSH_BTN),button0_isr,FALLING);
-    attachInterrupt(digitalPinToInterrupt(CH2_PUSH_BTN),button1_isr,FALLING);
+    // Remove hardware interrupts - using software debounce task instead
+    // attachInterrupt(digitalPinToInterrupt(CH1_PUSH_BTN),button0_isr,FALLING);
+    // attachInterrupt(digitalPinToInterrupt(CH2_PUSH_BTN),button1_isr,FALLING);
+    // attachInterrupt(digitalPinToInterrupt(CH1_SENSOR),sensor0_isr,FALLING);
+    // attachInterrupt(digitalPinToInterrupt(CH2_SENSOR),sensor1_isr,FALLING);
 
-    attachInterrupt(digitalPinToInterrupt(CH1_SENSOR),sensor0_isr,FALLING);
-    attachInterrupt(digitalPinToInterrupt(CH2_SENSOR),sensor1_isr,FALLING);
-
+    xTaskCreate(debounceTask, "debounce", 2048, NULL, 15, NULL);  // High priority for debounce
     xTaskCreate(buttonTask,"btn",2048,NULL,10,NULL);
     xTaskCreate(sensorTask,"sen",2048,NULL,10,NULL);
     xTaskCreate(controlTask,"ctrl",4096,NULL,10,NULL);
 
     Serial.println("[INFO] SYSTEM READY (MODE A), Door type: " + String(isSpeedDoor ? "SPEED" : "MANUAL"));
+    Serial.println("[INFO] Software debouncing enabled: BTN=" + String(BTN_DEBOUNCE_TIME) + "ms, SENSOR=" + String(SENSOR_DEBOUNCE_TIME) + "ms");
 }
 
 void loop()
