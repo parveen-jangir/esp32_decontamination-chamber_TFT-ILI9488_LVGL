@@ -241,7 +241,9 @@ void handleModeAB_Button(int btnID)
     lockDoor(exitChannel);
 
     setGreen(entryChannel, true);
+    setGreen(exitChannel, false);
     setAux(true);
+    setRed(true);
 
     stateStartTime = millis();
     systemState = ENTRY_OPEN;
@@ -256,14 +258,15 @@ void handleModeAB_Sensor(int sensorID)
         {
             if (isDoorClosed(entryChannel))
             {
+                stateStartTime = millis();
                 lockDoor(entryChannel);
                 Serial.println(F("[INFO] Entry door closed - Starting process in 1 second"));
                 vTaskDelay(pdMS_TO_TICKS(1000));
                 setRed(true);
+                setGreen(exitChannel, false);
                 setGreen(entryChannel, false);
                 startSpray();
 
-                stateStartTime = millis();
                 systemState = PROCESS_RUNNING;
             }
         }
@@ -294,27 +297,24 @@ void handleModeAB_Sensor(int sensorID)
 }
 
 // ==================== WARNING ====================
-void handleWarning()
-{
-    static bool blink=false;
-    static unsigned long t=0;
-
-    if (millis()-t>500)
-    {
-        t=millis();
-        blink=!blink;
-        setRed(blink);
-    }
-
-    setAux(true);
-
-    if (isDoorClosed(1) && isDoorClosed(2))
-    {
-        setRed(false);
-        Serial.println(F("[INFO] Warning resolved - System reset to IDLE"));
-        systemState = IDLE;
-    }
-}
+// void handleWarning()
+// {
+//     static bool blink=false;
+//     static unsigned long t=0;
+//     if (millis()-t>500)
+//     {
+//         t=millis();
+//         blink=!blink;
+//         setRed(blink);
+//     }
+//     setAux(true);
+//     if (isDoorClosed(1) && isDoorClosed(2))
+//     {
+//         setRed(false);
+//         Serial.println(F("[INFO] Warning resolved - System reset to IDLE"));
+//         systemState = IDLE;
+//     }
+// }
 
 // ==================== EMERGENCY ====================
 void handleEmergency()
@@ -356,6 +356,20 @@ void handleGreenLED(unsigned long time, int ch = 1)
         t=millis();
         blink=!blink;
         setGreen(ch, blink);
+    }
+}
+
+// ==================== RED LED BLINK =====================
+void handleRedLED(unsigned long time)
+{
+    static bool blink=false;
+    static unsigned long t=0;
+
+    if (millis()-t>time)
+    {
+        t=millis();
+        blink=!blink;
+        setRed(blink);
     }
 }
 
@@ -410,20 +424,8 @@ void controlTask(void *pv)
             systemState = EMERGENCY_STATE;
         }
 
-        // If door opened during processing
-        if (systemState == PROCESS_RUNNING)
-        {
-            if ((ch1_sensor == DOOR_OPEN || ch2_sensor == DOOR_OPEN) && systemState != SYSTEM_FAILURE)
-            {
-                Serial.println(F("[ERROR] Door opened during process - Emergency state"));
-                preFailure();
-                stateStartTime = millis();
-                systemState = SYSTEM_FAILURE;
-            }
-        }
-
         // Both doors should not be open at the same time
-        if ((ch1_sensor == DOOR_OPEN && ch2_sensor == DOOR_OPEN) && systemState != SYSTEM_FAILURE)
+        if ((ch1_sensor == DOOR_OPEN && ch2_sensor == DOOR_OPEN) && systemState != SYSTEM_FAILURE && systemState != EMERGENCY_STATE)
         {
             Serial.println(F("[ERROR] Both doors are open - Emergency state"));
             preFailure();
@@ -431,9 +433,10 @@ void controlTask(void *pv)
             systemState = SYSTEM_FAILURE;
         }
 
-        if ((ch1_sensor == DOOR_OPEN || ch2_sensor == DOOR_OPEN) && systemState != SYSTEM_FAILURE)
+        switch (systemState)
         {
-            if(systemState == IDLE)
+        case IDLE:
+            if (ch1_sensor == DOOR_OPEN || ch2_sensor == DOOR_OPEN)
             {
                 setAux(true);
                 Serial.println(F("[WARNING] Door opened while idle - Warning state"));
@@ -441,16 +444,14 @@ void controlTask(void *pv)
                 stateStartTime = millis();
                 systemState = SYSTEM_FAILURE;
             }
-        }
+            break;
 
-        switch (systemState)
-        {
         case INIT_CHECK:
             if (ch1_sensor == DOOR_CLOSED && ch2_sensor == DOOR_CLOSED)
             {
                 setRed(false);
-                setGreen(1,false);
-                setGreen(2,false);
+                setGreen(1,true);
+                setGreen(2,true);
                 lockDoor(1);
                 lockDoor(2);
                 stopSpray();
@@ -504,18 +505,31 @@ void controlTask(void *pv)
             {
                 lockDoor(exitChannel);  // Fixed: was entryChannel
             }
+            handleRedLED(500);
             break;
 
         case PROCESS_RUNNING:
+
+            // If door opened during processing
+            if ((ch1_sensor == DOOR_OPEN || ch2_sensor == DOOR_OPEN))
+            {
+                Serial.println(F("[ERROR] Door opened during process - Emergency state"));
+                preFailure();
+                stateStartTime = millis();
+                systemState = SYSTEM_FAILURE;
+            }
+
             if (isTimeout(SPRAY_DURATION))
             {
+                stateStartTime = millis();
                 stopSpray();
+                vTaskDelay(pdMS_TO_TICKS(500)); // Short delay to ensure spray is fully stopped before locking
                 unlockDoor(exitChannel);
         
-                stateStartTime = millis();
                 Serial.println(F("[INFO] Spray duration completed"));
                 systemState = EXIT_OPEN;
             }
+            handleRedLED(500);
             break;
 
         case EXIT_OPEN:
@@ -538,6 +552,7 @@ void controlTask(void *pv)
                 Serial.println(F("[INFO] Exit door opened - Waiting for close"));
                 systemState = WAIT_EXIT_CLOSE;
             }
+            handleRedLED(500);
             break;
 
         case WARNING_TIMEOUT:
