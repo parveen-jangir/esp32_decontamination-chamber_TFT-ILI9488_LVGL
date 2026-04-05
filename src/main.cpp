@@ -349,6 +349,7 @@ void handleModeAB_Sensor(int sensorID)
 
         else if (entryChannel == 2 && sensorID == 1 && isDoorClosed(entryChannel))
         {
+            stateStartTime = millis();
             lockDoor(entryChannel);
             setRed(true);
             setGreen(entryChannel, false);
@@ -359,13 +360,13 @@ void handleModeAB_Sensor(int sensorID)
         }
         else if (sensorID == 2 && current_mode == MODE_C && isDoorClosed(entryChannel))
         {
+            stateStartTime = millis();
             lockDoor(entryChannel);
             setRed(true);
             setGreen(entryChannel, false);
             Serial.println(F("[INFO] Reverse entry door closed - open exit door in 1 second"));
             vTaskDelay(pdMS_TO_TICKS(1000));
             unlockDoor(exitChannel);
-             if(current_mode == MODE_C) unlockDoor(additionalChannel);
             systemState = EXIT_OPEN;
         }
     }
@@ -425,11 +426,12 @@ void handleEmergency()
         setRed(blink);
         setGreen(1, blink);
         setGreen(2, blink);
+        if(current_mode == MODE_C) setGreen(3, blink);
     }
 
     if (isTimeout(EMERGENCY_TIMEOUT))
     {
-        if (isDoorClosed(1) && isDoorClosed(2))
+        if (isDoorClosed(1) && isDoorClosed(2) && (current_mode != MODE_C || isDoorClosed(3)))
         {
             setRed(false);
             setGreen(1,false);
@@ -520,7 +522,11 @@ void controlTask(void *pv)
             setRed(true);
             setGreen(1,true);
             setGreen(2,true);
-            setGreen(3,true);
+            if(current_mode == MODE_C)
+            {
+                setGreen(3,true);
+                unlockDoor(3);
+            }
             stateStartTime = millis();
             systemState = EMERGENCY_STATE;
         }
