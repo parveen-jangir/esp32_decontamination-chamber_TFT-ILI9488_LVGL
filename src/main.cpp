@@ -293,11 +293,22 @@ void handleModeAB_Button(int btnID)
         exitChannel = 2;
         Serial.println(F("[INFO] CH1 button pressed - Starting process"));
     }
-    else if (btnID == 1 || btnID == 2) // CH2 → Reverse
+    else if (btnID == 1) // CH2 → Reverse
     {
         entryChannel = 2;
         exitChannel = 1;
         Serial.println(F("[INFO] CH2 button pressed - Starting process"));
+    }
+    else if (btnID == 2 && current_mode == MODE_C) // CH3 → Additional channel for MODE C
+    {
+        entryChannel = 3;
+        exitChannel = 1; // In MODE C, exit is always channel 1
+        Serial.println(F("[INFO] CH3 button pressed - Starting process (MODE C)"));
+    }
+    else
+    {
+        Serial.println(F("[ERROR] Invalid button ID or button not allowed in current mode"));
+        return;
     }
 
     unlockDoor(entryChannel);
@@ -361,13 +372,21 @@ void handleModeAB_Sensor(int sensorID)
 
     if (systemState == WAIT_EXIT_CLOSE)
     {
-        if (isDoorClosed(exitChannel))
+        if (isDoorClosed(exitChannel) && current_mode != MODE_C)
         {
             lockDoor(exitChannel);
-            if(current_mode == MODE_C) lockDoor(additionalChannel);
             setRed(false);
             setAux(false);
             Serial.println(F("[INFO] Exit door closed - Process completed"));
+            systemState = INIT_CHECK;
+        }
+        else if (isDoorClosed(exitChannel) && isDoorClosed(additionalChannel) && current_mode == MODE_C)
+        {
+            lockDoor(exitChannel);
+            lockDoor(additionalChannel);
+            setRed(false);
+            setAux(false);
+            Serial.println(F("[INFO] Exit doors closed - Process completed (MODE C)"));
             systemState = INIT_CHECK;
         }
     }
@@ -531,7 +550,7 @@ void controlTask(void *pv)
         switch (systemState)
         {
         case IDLE:
-            if (ch1_sensor == DOOR_OPEN || ch2_sensor == DOOR_OPEN)
+            if (ch1_sensor == DOOR_OPEN || ch2_sensor == DOOR_OPEN || (current_mode == MODE_C && ch3_sensor == DOOR_OPEN))
             {
                 setAux(true);
                 Serial.println(F("[WARNING] Door opened while idle - Warning state"));
@@ -635,7 +654,7 @@ void controlTask(void *pv)
         case PROCESS_RUNNING:
 
             // If door opened during processing
-            if ((ch1_sensor == DOOR_OPEN || ch2_sensor == DOOR_OPEN))
+            if ((ch1_sensor == DOOR_OPEN || ch2_sensor == DOOR_OPEN || (current_mode == MODE_C && ch3_sensor == DOOR_OPEN)))
             {
                 Serial.println(F("[ERROR] Door opened during process - Emergency state"));
                 preFailure();
@@ -688,7 +707,7 @@ void controlTask(void *pv)
             }
             else
             {
-                if (!isDoorClosed(exitChannel) || isDoorClosed(additionalChannel))
+                if (!isDoorClosed(exitChannel) || !isDoorClosed(additionalChannel))
                 {
                     stateStartTime = millis();
                     Serial.println(F("[INFO] Exit door opened - Waiting for close (MODE C)"));
