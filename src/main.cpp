@@ -358,7 +358,7 @@ void handleModeAB_Sensor(int sensorID)
             unlockDoor(exitChannel);
             systemState = EXIT_OPEN;
         }
-        else if (sensorID == 2 && current_mode == MODE_C && isDoorClosed(entryChannel))
+        else if (entryChannel == 3 && sensorID == 2 && current_mode == MODE_C && isDoorClosed(entryChannel))
         {
             stateStartTime = millis();
             lockDoor(entryChannel);
@@ -544,7 +544,7 @@ void controlTask(void *pv)
         }
         else
         {
-            if ((ch1_sensor == DOOR_OPEN && ch2_sensor == DOOR_OPEN && ch3_sensor == DOOR_OPEN) && systemState != SYSTEM_FAILURE && systemState != EMERGENCY_STATE)
+            if (((ch1_sensor == DOOR_OPEN + ch2_sensor == DOOR_OPEN + ch3_sensor == DOOR_OPEN) >=2) && systemState != SYSTEM_FAILURE && systemState != EMERGENCY_STATE)
             {
                 Serial.println(F("[ERROR] All doors are open - Emergency state"));
                 preFailure();
@@ -652,7 +652,7 @@ void controlTask(void *pv)
             if (isSpeedDoor && isTimeout(SPEED_DOOR_TIMEOUT))
             {
                 lockDoor(exitChannel);  // Fixed: was entryChannel
-                if (current_mode == MODE_C) lockDoor(additionalChannel); // For MODE C
+                if (current_mode == MODE_C && exitChannel != 1) lockDoor(additionalChannel); // For MODE C
             }
             handleRedLED(500);
             break;
@@ -685,21 +685,17 @@ void controlTask(void *pv)
         case EXIT_OPEN:
             if (isTimeout(AUTO_RELOCK_TIMEOUT))
             {
-                if (isDoorClosed(exitChannel) && current_mode != MODE_C)
+                if (isDoorClosed(exitChannel) && (current_mode != MODE_C || isDoorClosed(additionalChannel)))
                 {
                     lockDoor(exitChannel);
+                    if (current_mode == MODE_C)
+                        lockDoor(additionalChannel);
                     Serial.println(F("[INFO] Exit door auto-locked due to timeout"));
+                    setAux(false);
+                    setRed(false);
+                    Serial.println(F("[INFO] Process completed 1"));
+                    systemState = INIT_CHECK;
                 }
-                else if(isDoorClosed(exitChannel) && isDoorClosed(additionalChannel))
-                {
-                    lockDoor(exitChannel);
-                    lockDoor(additionalChannel);
-                    Serial.println(F("[INFO] Exit doors auto-locked due to timeout (MODE C)"));
-                }
-                setAux(false);
-                setRed(false);
-                Serial.println(F("[INFO] Process completed 1"));
-                systemState = INIT_CHECK;
             }
 
             if (current_mode != MODE_C)
