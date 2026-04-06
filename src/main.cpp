@@ -13,7 +13,8 @@ static lv_disp_draw_buf_t draw_buf;
 static lv_color_t buf[480 * 20];
 
 // Label pointer (global for update)
-lv_obj_t * slider_label;
+lv_obj_t * slider_label;lv_obj_t * counter_label;  // Add this with your other globals
+volatile uint32_t seconds_counter = 0;
 
 /* ================= DISPLAY FLUSH ================= */
 void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p)
@@ -54,32 +55,19 @@ static void slider_event_cb(lv_event_t * e)
 
 void ui_init()
 {
-    // Title
+    // Create counter label
+    counter_label = lv_label_create(lv_scr_act());
+    lv_label_set_text(counter_label, "0");
+    lv_obj_set_style_text_font(counter_label, &lv_font_montserrat_48, 0);
+    lv_obj_center(counter_label);
+    lv_obj_set_style_text_color(counter_label, lv_color_black(), 0);
+    
+    // Optional title above counter
     lv_obj_t * title = lv_label_create(lv_scr_act());
-    lv_label_set_text(title, "LVGL Demo UI");
-    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 10);
-
-    // Button
-    lv_obj_t * btn = lv_btn_create(lv_scr_act());
-    lv_obj_set_size(btn, 120, 50);
-    lv_obj_align(btn, LV_ALIGN_CENTER, 0, -40);
-    lv_obj_add_event_cb(btn, btn_event_cb, LV_EVENT_CLICKED, NULL);
-
-    lv_obj_t * btn_label = lv_label_create(btn);
-    lv_label_set_text(btn_label, "Press Me");
-    lv_obj_center(btn_label);
-
-    // Slider
-    lv_obj_t * slider = lv_slider_create(lv_scr_act());
-    lv_obj_set_width(slider, 300);
-    lv_obj_align(slider, LV_ALIGN_CENTER, 0, 40);
-    lv_slider_set_range(slider, 0, 100);
-    lv_obj_add_event_cb(slider, slider_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
-
-    // Slider value label
-    slider_label = lv_label_create(lv_scr_act());
-    lv_label_set_text(slider_label, "Value: 0");
-    lv_obj_align(slider_label, LV_ALIGN_CENTER, 0, 80);
+    lv_label_set_text(title, "SYSTEM UPTIME");
+    lv_obj_set_style_text_font(title, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(title, lv_color_hex(0x00FFFF), 0);
+    lv_obj_align_to(title, counter_label, LV_ALIGN_OUT_TOP_MID, 0, -20);
 }
 
 void my_touch_read(lv_indev_drv_t * indev, lv_indev_data_t * data)
@@ -970,5 +958,9 @@ void loop()
             Serial.println(isSpeedDoor ? "ON" : "OFF");
         }
     }
-    vTaskDelay(pdMS_TO_TICKS(100));
+        seconds_counter++;
+        char buf[20];
+        sprintf(buf, "%lu", seconds_counter);
+        lv_label_set_text(counter_label, buf);
+        vTaskDelay(pdMS_TO_TICKS(1000));
 }
