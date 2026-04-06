@@ -81,7 +81,7 @@
 // ============================================================================
 // 8. GLOBAL GPIO PIN MAPPING
 // ============================================================================
-#define EMERGENCY_BTN_PIN   4    // Emergency Button (GPIO4, active-LOW pull-up)
+#define EMERGENCY_BTN_PIN   5    // Emergency Button (GPIO5, active-LOW pull-up)
 #define RELAY4_SPRAY_PIN    22   // Decontamination/Spray Relay (GPIO22, active-HIGH)
 #define AUX_LIGHT_PIN       21   // Auxiliary Light (GPIO21)
 
