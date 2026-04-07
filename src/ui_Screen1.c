@@ -7,7 +7,6 @@
 
 lv_obj_t * ui_Screen1 = NULL;
 lv_obj_t * ui_Arc1 = NULL;
-lv_obj_t * ui_Arc3 = NULL;
 // event funtions
 
 // build funtions
@@ -18,20 +17,10 @@ void ui_Screen1_screen_init(void)
     lv_obj_clear_flag(ui_Screen1, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
 
     ui_Arc1 = lv_arc_create(ui_Screen1);
-    lv_obj_set_width(ui_Arc1, 150);
-    lv_obj_set_height(ui_Arc1, 150);
-    lv_obj_set_x(ui_Arc1, 68);
-    lv_obj_set_y(ui_Arc1, 156);
+    lv_obj_set_width(ui_Arc1, 263);
+    lv_obj_set_height(ui_Arc1, 377);
     lv_obj_set_align(ui_Arc1, LV_ALIGN_CENTER);
     lv_arc_set_value(ui_Arc1, 50);
-
-    ui_Arc3 = lv_arc_create(ui_Screen1);
-    lv_obj_set_width(ui_Arc3, 150);
-    lv_obj_set_height(ui_Arc3, 85);
-    lv_obj_set_x(ui_Arc3, -70);
-    lv_obj_set_y(ui_Arc3, -180);
-    lv_obj_set_align(ui_Arc3, LV_ALIGN_CENTER);
-    lv_arc_set_value(ui_Arc3, 50);
 
 }
 
@@ -42,6 +31,5 @@ void ui_Screen1_screen_destroy(void)
     // NULL screen variables
     ui_Screen1 = NULL;
     ui_Arc1 = NULL;
-    ui_Arc3 = NULL;
 
 }
