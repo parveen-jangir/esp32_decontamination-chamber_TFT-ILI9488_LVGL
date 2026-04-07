@@ -5,16 +5,13 @@
 #include "config.h"
 #include <lvgl.h>
 #include <TFT_eSPI.h>
+#include "ui.h"
 
 TFT_eSPI tft = TFT_eSPI();
 
 // Buffer
 static lv_disp_draw_buf_t draw_buf;
-static lv_color_t buf[480 * 20];
-
-// Label pointer (global for update)
-lv_obj_t * slider_label;lv_obj_t * counter_label;  // Add this with your other globals
-volatile uint32_t seconds_counter = 0;
+static lv_color_t buf[320 * 20];
 
 /* ================= DISPLAY FLUSH ================= */
 void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p)
@@ -28,46 +25,6 @@ void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color
     tft.endWrite();
 
     lv_disp_flush_ready(disp);
-}
-
-/* ================= EVENTS ================= */
-
-// Button event
-static void btn_event_cb(lv_event_t * e)
-{
-    if(lv_event_get_code(e) == LV_EVENT_CLICKED) {
-        Serial.println("Button Pressed!");
-    }
-}
-
-// Slider event
-static void slider_event_cb(lv_event_t * e)
-{
-    lv_obj_t * slider = lv_event_get_target(e);
-    int value = lv_slider_get_value(slider);
-
-    char buf[20];
-    sprintf(buf, "Value: %d", value);
-    lv_label_set_text(slider_label, buf);
-}
-
-/* ================= UI ================= */
-
-void ui_init()
-{
-    // Create counter label
-    counter_label = lv_label_create(lv_scr_act());
-    lv_label_set_text(counter_label, "0");
-    lv_obj_set_style_text_font(counter_label, &lv_font_montserrat_48, 0);
-    lv_obj_center(counter_label);
-    lv_obj_set_style_text_color(counter_label, lv_color_black(), 0);
-    
-    // Optional title above counter
-    lv_obj_t * title = lv_label_create(lv_scr_act());
-    lv_label_set_text(title, "SYSTEM UPTIME");
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(title, lv_color_hex(0x00FFFF), 0);
-    lv_obj_align_to(title, counter_label, LV_ALIGN_OUT_TOP_MID, 0, -20);
 }
 
 void my_touch_read(lv_indev_drv_t * indev, lv_indev_data_t * data)
@@ -475,26 +432,6 @@ void handleModeAB_Sensor(int sensorID)
     }
 }
 
-// ==================== WARNING ====================
-// void handleWarning()
-// {
-//     static bool blink=false;
-//     static unsigned long t=0;
-//     if (millis()-t>500)
-//     {
-//         t=millis();
-//         blink=!blink;
-//         setRed(blink);
-//     }
-//     setAux(true);
-//     if (isDoorClosed(1) && isDoorClosed(2))
-//     {
-//         setRed(false);
-//         Serial.println(F("[INFO] Warning resolved - System reset to IDLE"));
-//         systemState = IDLE;
-//     }
-// }
-
 // ==================== EMERGENCY ====================
 void handleEmergency()
 {
@@ -897,23 +834,23 @@ void setup()
     Serial.println("[INFO] Software debouncing enabled: BTN=" + String(BTN_DEBOUNCE_TIME) + "ms, SENSOR=" + String(SENSOR_DEBOUNCE_TIME) + "ms");
 
     tft.begin();
-    tft.setRotation(1);   // Keep same rotation as calibration
+    tft.setRotation(0);
 
     // ADD THIS RIGHT HERE
-    uint16_t calData[5] = { 249, 3661, 86, 3625, 7 };
+    uint16_t calData[5] = { 113, 3608, 212, 3684, 4 };
     tft.setTouch(calData);
 
     lv_init();
 
     // Buffer init
-    lv_disp_draw_buf_init(&draw_buf, buf, NULL, 480 * 20);
+    lv_disp_draw_buf_init(&draw_buf, buf, NULL, 320 * 20);
 
     // Display driver
     static lv_disp_drv_t disp_drv;
     lv_disp_drv_init(&disp_drv);
 
-    disp_drv.hor_res = 480;
-    disp_drv.ver_res = 320;
+    disp_drv.hor_res = 320;
+    disp_drv.ver_res = 480;
     disp_drv.flush_cb = my_disp_flush;
     disp_drv.draw_buf = &draw_buf;
 
@@ -958,9 +895,4 @@ void loop()
             Serial.println(isSpeedDoor ? "ON" : "OFF");
         }
     }
-        seconds_counter++;
-        char buf[20];
-        sprintf(buf, "%lu", seconds_counter);
-        lv_label_set_text(counter_label, buf);
-        vTaskDelay(pdMS_TO_TICKS(1000));
 }
