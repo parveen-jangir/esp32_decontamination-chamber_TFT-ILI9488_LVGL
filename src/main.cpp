@@ -68,6 +68,8 @@ typedef enum
 } SystemState;
 
 volatile SystemState systemState = INIT_CHECK;
+// Global label for serial input number
+String serialInputBuffer = "";   // To collect digits from serial
 
 // ==================== CONTEXT ====================
 uint8_t entryChannel = 0; // 1 or 2
@@ -870,29 +872,62 @@ void setup()
 
 void loop()
 {
-    if(Serial.available())
+    // === Handle Serial Input for Number ===
+    while (Serial.available())
+    {
+        char c = Serial.read();
+
+        if (c == '\n' || c == '\r')   // Enter key pressed
+        {
+            if (serialInputBuffer.length() > 0)
+            {
+                // Update the label on screen
+                lv_label_set_text(ui_SerialNumberLabel, serialInputBuffer.c_str());
+                
+                Serial.print(F("[SERIAL] Number displayed: "));
+                Serial.println(serialInputBuffer);
+                
+                // Optional: Clear buffer after displaying
+                // serialInputBuffer = "";   
+            }
+        }
+        else if (isdigit(c))          // Only accept digits 0-9
+        {
+            serialInputBuffer += c;
+            
+            // Optional: Live preview while typing
+            // lv_label_set_text(ui_SerialNumberLabel, serialInputBuffer.c_str());
+        }
+        else if (c == 'i')             // Handle backspace
+        {
+            lv_label_set_text(ui_homeNotification, "IDLE");
+        }
+        else if(c == 'e')              // Handle backspace
+        {
+            lv_label_set_text(ui_homeNotification, "ENTRY OPEN");
+        }
+        else if (c == 'c' || c == 'C')   // Clear command
+        {
+            serialInputBuffer = "";
+            lv_label_set_text(ui_SerialNumberLabel, "00");
+            Serial.println(F("[SERIAL] Display cleared"));
+        }
+    }
+
+    // Your existing serial mode switching code
+    if (Serial.available())
     {
         char cmd = Serial.read();
-        if (cmd == 'a' || cmd == 'A')
-        {
-            current_mode = MODE_A;
-            Serial.println("[Serial] Switched to MODE A");
-        }
-        else if (cmd == 'b' || cmd == 'B')
-        {
-            current_mode = MODE_B;
-            Serial.println("[Serial] Switched to MODE B");
-        }
-        else if (cmd == 'c' || cmd == 'C')
-        {
-            current_mode = MODE_C;
-            Serial.println("[Serial] Switched to MODE C");
-        }
-        else if (cmd == 's' || cmd == 'S')
-        {
+        if (cmd == 'a' || cmd == 'A') { current_mode = MODE_A; Serial.println("[Serial] Switched to MODE A"); }
+        else if (cmd == 'b' || cmd == 'B') { current_mode = MODE_B; Serial.println("[Serial] Switched to MODE B"); }
+        else if (cmd == 'c' || cmd == 'C') { current_mode = MODE_C; Serial.println("[Serial] Switched to MODE C"); }
+        else if (cmd == 's' || cmd == 'S') {
             isSpeedDoor = !isSpeedDoor;
             Serial.print("[Serial] Speed Door Mode: ");
             Serial.println(isSpeedDoor ? "ON" : "OFF");
         }
     }
+
+    // Small delay to avoid blocking
+    vTaskDelay(pdMS_TO_TICKS(10));
 }

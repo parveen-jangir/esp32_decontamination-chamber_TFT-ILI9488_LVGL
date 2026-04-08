@@ -27,6 +27,11 @@ extern "C" {
 
 extern lv_obj_t * ui____initial_actions0;
 
+// FONTS
+LV_FONT_DECLARE(ui_font_Montserrat60);
+LV_FONT_DECLARE(ui_font_Montserrat90);
+LV_FONT_DECLARE(ui_font_Montserrat150);
+
 // UI INIT
 void ui_init(void);
 void ui_destroy(void);

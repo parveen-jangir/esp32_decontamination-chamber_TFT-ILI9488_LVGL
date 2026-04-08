@@ -6,7 +6,9 @@
 #include "ui.h"
 
 lv_obj_t * ui_Screen1 = NULL;
-lv_obj_t * ui_Arc1 = NULL;
+lv_obj_t * ui_Label1 = NULL;
+lv_obj_t * ui_SerialNumberLabel = NULL;
+lv_obj_t * ui_homeNotification = NULL;
 // event funtions
 
 // build funtions
@@ -16,11 +18,32 @@ void ui_Screen1_screen_init(void)
     ui_Screen1 = lv_obj_create(NULL);
     lv_obj_clear_flag(ui_Screen1, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
 
-    ui_Arc1 = lv_arc_create(ui_Screen1);
-    lv_obj_set_width(ui_Arc1, 263);
-    lv_obj_set_height(ui_Arc1, 377);
-    lv_obj_set_align(ui_Arc1, LV_ALIGN_CENTER);
-    lv_arc_set_value(ui_Arc1, 50);
+    ui_Label1 = lv_label_create(ui_Screen1);
+    lv_obj_set_width(ui_Label1, LV_SIZE_CONTENT);   /// 1
+    lv_obj_set_height(ui_Label1, LV_SIZE_CONTENT);    /// 1
+    lv_obj_set_x(ui_Label1, 3);
+    lv_obj_set_y(ui_Label1, -223);
+    lv_obj_set_align(ui_Label1, LV_ALIGN_CENTER);
+    lv_label_set_text(ui_Label1, "10:10                       01/01/2026");
+    lv_obj_set_style_text_font(ui_Label1, &lv_font_montserrat_22, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    ui_SerialNumberLabel = lv_label_create(ui_Screen1);
+    lv_obj_set_width(ui_SerialNumberLabel, LV_SIZE_CONTENT);   /// 1
+    lv_obj_set_height(ui_SerialNumberLabel, LV_SIZE_CONTENT);    /// 1
+    lv_obj_set_x(ui_SerialNumberLabel, 4);
+    lv_obj_set_y(ui_SerialNumberLabel, -48);
+    lv_obj_set_align(ui_SerialNumberLabel, LV_ALIGN_CENTER);
+    lv_label_set_text(ui_SerialNumberLabel, "00");
+    lv_obj_set_style_text_font(ui_SerialNumberLabel, &ui_font_Montserrat150, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    ui_homeNotification = lv_label_create(ui_Screen1);
+    lv_obj_set_width(ui_homeNotification, LV_SIZE_CONTENT);   /// 1
+    lv_obj_set_height(ui_homeNotification, LV_SIZE_CONTENT);    /// 1
+    lv_obj_set_x(ui_homeNotification, -2);
+    lv_obj_set_y(ui_homeNotification, 206);
+    lv_obj_set_align(ui_homeNotification, LV_ALIGN_CENTER);
+    lv_label_set_text(ui_homeNotification, "IDLE");
+    lv_obj_set_style_text_font(ui_homeNotification, &lv_font_montserrat_20, LV_PART_MAIN | LV_STATE_DEFAULT);
 
 }
 
@@ -30,6 +53,8 @@ void ui_Screen1_screen_destroy(void)
 
     // NULL screen variables
     ui_Screen1 = NULL;
-    ui_Arc1 = NULL;
+    ui_Label1 = NULL;
+    ui_SerialNumberLabel = NULL;
+    ui_homeNotification = NULL;
 
 }
