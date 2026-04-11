@@ -6,9 +6,10 @@
 #include "ui.h"
 
 lv_obj_t * ui_Screen1 = NULL;
-lv_obj_t * ui_Label1 = NULL;
+lv_obj_t * ui_time = NULL;
 lv_obj_t * ui_SerialNumberLabel = NULL;
 lv_obj_t * ui_homeNotification = NULL;
+lv_obj_t * ui_date = NULL;
 // event funtions
 
 // build funtions
@@ -18,20 +19,23 @@ void ui_Screen1_screen_init(void)
     ui_Screen1 = lv_obj_create(NULL);
     lv_obj_clear_flag(ui_Screen1, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
 
-    ui_Label1 = lv_label_create(ui_Screen1);
-    lv_obj_set_width(ui_Label1, LV_SIZE_CONTENT);   /// 1
-    lv_obj_set_height(ui_Label1, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_Label1, 3);
-    lv_obj_set_y(ui_Label1, -223);
-    lv_obj_set_align(ui_Label1, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_Label1, "10:10                       01/01/2026");
-    lv_obj_set_style_text_font(ui_Label1, &lv_font_montserrat_22, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_shadow_color(ui_Screen1, lv_color_hex(0xFFFFFF), LV_PART_SCROLLBAR | LV_STATE_DEFAULT);
+    lv_obj_set_style_shadow_opa(ui_Screen1, 255, LV_PART_SCROLLBAR | LV_STATE_DEFAULT);
+
+    ui_time = lv_label_create(ui_Screen1);
+    lv_obj_set_width(ui_time, LV_SIZE_CONTENT);   /// 1
+    lv_obj_set_height(ui_time, LV_SIZE_CONTENT);    /// 1
+    lv_obj_set_x(ui_time, -103);
+    lv_obj_set_y(ui_time, -220);
+    lv_obj_set_align(ui_time, LV_ALIGN_CENTER);
+    lv_label_set_text(ui_time, "10:10 AM");
+    lv_obj_set_style_text_font(ui_time, &lv_font_montserrat_22, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_SerialNumberLabel = lv_label_create(ui_Screen1);
     lv_obj_set_width(ui_SerialNumberLabel, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_SerialNumberLabel, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_SerialNumberLabel, 4);
-    lv_obj_set_y(ui_SerialNumberLabel, -48);
+    lv_obj_set_x(ui_SerialNumberLabel, 0);
+    lv_obj_set_y(ui_SerialNumberLabel, -40);
     lv_obj_set_align(ui_SerialNumberLabel, LV_ALIGN_CENTER);
     lv_label_set_text(ui_SerialNumberLabel, "00");
     lv_obj_set_style_text_font(ui_SerialNumberLabel, &ui_font_Montserrat150, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -42,8 +46,19 @@ void ui_Screen1_screen_init(void)
     lv_obj_set_x(ui_homeNotification, -2);
     lv_obj_set_y(ui_homeNotification, 206);
     lv_obj_set_align(ui_homeNotification, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_homeNotification, "IDLE");
+    lv_label_set_text(ui_homeNotification, "HELLO");
+    lv_obj_set_style_text_color(ui_homeNotification, lv_color_hex(0xFC0505), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_opa(ui_homeNotification, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_homeNotification, &lv_font_montserrat_20, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    ui_date = lv_label_create(ui_Screen1);
+    lv_obj_set_width(ui_date, LV_SIZE_CONTENT);   /// 1
+    lv_obj_set_height(ui_date, LV_SIZE_CONTENT);    /// 1
+    lv_obj_set_x(ui_date, 91);
+    lv_obj_set_y(ui_date, -220);
+    lv_obj_set_align(ui_date, LV_ALIGN_CENTER);
+    lv_label_set_text(ui_date, "01/01/2026");
+    lv_obj_set_style_text_font(ui_date, &lv_font_montserrat_22, LV_PART_MAIN | LV_STATE_DEFAULT);
 
 }
 
@@ -53,8 +68,9 @@ void ui_Screen1_screen_destroy(void)
 
     // NULL screen variables
     ui_Screen1 = NULL;
-    ui_Label1 = NULL;
+    ui_time = NULL;
     ui_SerialNumberLabel = NULL;
     ui_homeNotification = NULL;
+    ui_date = NULL;
 
 }

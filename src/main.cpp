@@ -13,6 +13,8 @@ TFT_eSPI tft = TFT_eSPI();
 static lv_disp_draw_buf_t draw_buf;
 static lv_color_t buf[320 * 20];
 
+int timer = SPRAY_DURATION / 1000; // Timer in seconds
+
 /* ================= DISPLAY FLUSH ================= */
 void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p)
 {
@@ -97,6 +99,24 @@ volatile unsigned long ch3_sensor_last_time = 0;
 volatile bool ch1_sensor_closed = false;
 volatile bool ch2_sensor_closed = false;
 volatile bool ch3_sensor_closed = false;
+
+void handleTimer(bool reset = false){
+    static unsigned long t=0;
+
+    if(reset) {
+        timer = SPRAY_DURATION / 1000;
+    }
+
+    if (millis()-t > 1000)
+    {
+        t=millis();
+
+        Serial.println("[TIMER] Timer tick: " + String(timer));
+        lv_label_set_text(ui_SerialNumberLabel, String(timer).c_str());
+        timer--;
+
+    }
+}
 
 // ==================== HELPERS ====================
 bool isTimeout(unsigned long t)
@@ -377,13 +397,14 @@ void handleModeAB_Sensor(int sensorID)
                 stateStartTime = millis();
                 lockDoor(entryChannel);
                 Serial.println(F("[INFO] Entry door closed - Starting process in 1 second"));
+                handleTimer(true); // Reset timer
                 vTaskDelay(pdMS_TO_TICKS(1000));
                 setRed(true);
                 setGreen(exitChannel, false);
                 setGreen(entryChannel, false);
                 if(current_mode == MODE_C) setGreen(additionalChannel, false);
                 startSpray();
-
+                lv_label_set_text(ui_homeNotification, "PROCESS RUNNING...");
                 systemState = PROCESS_RUNNING;
             }
         }
@@ -549,6 +570,7 @@ void controlTask(void *pv)
                 unlockDoor(3);
             }
             stateStartTime = millis();
+            lv_label_set_text(ui_homeNotification, "EMERGENCY !");
             systemState = EMERGENCY_STATE;
         }
 
@@ -560,6 +582,7 @@ void controlTask(void *pv)
                 Serial.println(F("[ERROR] Both doors are open - Emergency state"));
                 preFailure();
                 stateStartTime = millis();
+                lv_label_set_text(ui_homeNotification, "SYSTEM FAILURE !");
                 systemState = SYSTEM_FAILURE;
             }
         }
@@ -570,6 +593,7 @@ void controlTask(void *pv)
                 Serial.println(F("[ERROR] All doors are open - Emergency state"));
                 preFailure();
                 stateStartTime = millis();
+                lv_label_set_text(ui_homeNotification, "SYSTEM FAILURE !");
                 systemState = SYSTEM_FAILURE;
             }
         }
@@ -583,6 +607,7 @@ void controlTask(void *pv)
                 Serial.println(F("[WARNING] Door opened while idle - Warning state"));
                 preFailure();
                 stateStartTime = millis();
+                lv_label_set_text(ui_homeNotification, "SYSTEM FAILURE !");
                 systemState = SYSTEM_FAILURE;
             }
             break;
@@ -600,6 +625,7 @@ void controlTask(void *pv)
                     stopSpray();
                     setAux(false);
                     Serial.println(F("[INFO] System initialized - IDLE state"));
+                    lv_label_set_text(ui_homeNotification, "");
                     systemState = IDLE;
                 }
                 else
@@ -608,6 +634,7 @@ void controlTask(void *pv)
                     Serial.println(F("[ERROR] System initialization failed - Please close both doors"));
                     preFailure();
                     stateStartTime = millis();
+                    lv_label_set_text(ui_homeNotification, "SYSTEM FAILURE !");
                     systemState = SYSTEM_FAILURE;
                 }
             }
@@ -625,6 +652,7 @@ void controlTask(void *pv)
                     stopSpray();
                     setAux(false);
                     Serial.println(F("[INFO] System initialized - IDLE state (MODE C)"));
+                    lv_label_set_text(ui_homeNotification, "");
                     systemState = IDLE;
                 }
                 else
@@ -633,6 +661,7 @@ void controlTask(void *pv)
                     Serial.println(F("[ERROR] System initialization failed - Please close all doors (MODE C)"));
                     preFailure();
                     stateStartTime = millis();
+                    lv_label_set_text(ui_homeNotification, "SYSTEM FAILURE !");
                     systemState = SYSTEM_FAILURE;
                 }
             }
@@ -655,6 +684,7 @@ void controlTask(void *pv)
             {
                 stateStartTime = millis();
                 Serial.println(F("[INFO] Entry door opened - Waiting for close"));
+
                 // lockDoor(entryChannel); this will required here in speed door
                 systemState = WAIT_ENTRY_CLOSE;
             }
@@ -679,6 +709,7 @@ void controlTask(void *pv)
             break;
 
         case PROCESS_RUNNING:
+            handleTimer();
 
             // If door opened during processing
             if ((ch1_sensor == DOOR_OPEN || ch2_sensor == DOOR_OPEN || (current_mode == MODE_C && ch3_sensor == DOOR_OPEN)))
@@ -686,6 +717,8 @@ void controlTask(void *pv)
                 Serial.println(F("[ERROR] Door opened during process - Emergency state"));
                 preFailure();
                 stateStartTime = millis();
+                lv_label_set_text(ui_SerialNumberLabel, "00");
+                lv_label_set_text(ui_homeNotification, "SYSTEM FAILURE !");
                 systemState = SYSTEM_FAILURE;
             }
 
@@ -698,6 +731,7 @@ void controlTask(void *pv)
                 if (current_mode == MODE_C) unlockDoor(additionalChannel); // For MODE C, unlock additional channel
         
                 Serial.println(F("[INFO] Spray duration completed"));
+                lv_label_set_text(ui_SerialNumberLabel, "00");
                 systemState = EXIT_OPEN;
             }
             handleRedLED(500);
@@ -826,15 +860,6 @@ void setup()
     pinMode(CH3_GREEN_LED,OUTPUT);
     pinMode(CH1_RED_LED,OUTPUT);
 
-    xTaskCreate(debounceTask, "debounce", 2048, NULL, 15, NULL);  // High priority for debounce
-    xTaskCreate(buttonTask,"btn",2048,NULL,10,NULL);
-    xTaskCreate(sensorTask,"sen",2048,NULL,10,NULL);
-    xTaskCreate(controlTask,"ctrl",4096,NULL,10,NULL);
-    xTaskCreate(handleDisplayTask,"disp",4096,NULL,10,NULL);
-
-    Serial.println("[INFO] SYSTEM READY (MODE A), Door type: " + String(isSpeedDoor ? "SPEED" : "MANUAL"));
-    Serial.println("[INFO] Software debouncing enabled: BTN=" + String(BTN_DEBOUNCE_TIME) + "ms, SENSOR=" + String(SENSOR_DEBOUNCE_TIME) + "ms");
-
     tft.begin();
     tft.setRotation(0);
 
@@ -868,6 +893,16 @@ void setup()
     lv_indev_drv_register(&indev_drv);
 
     ui_init();
+
+    xTaskCreate(debounceTask, "debounce", 2048, NULL, 15, NULL);  // High priority for debounce
+    xTaskCreate(buttonTask,"btn",2048,NULL,10,NULL);
+    xTaskCreate(sensorTask,"sen",2048,NULL,10,NULL);
+    xTaskCreate(controlTask,"ctrl",4096,NULL,10,NULL);
+    xTaskCreate(handleDisplayTask,"disp",4096,NULL,10,NULL);
+
+    Serial.println("[INFO] SYSTEM READY (MODE A), Door type: " + String(isSpeedDoor ? "SPEED" : "MANUAL"));
+    Serial.println("[INFO] Software debouncing enabled: BTN=" + String(BTN_DEBOUNCE_TIME) + "ms, SENSOR=" + String(SENSOR_DEBOUNCE_TIME) + "ms");
+
 }
 
 void loop()
