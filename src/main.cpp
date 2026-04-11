@@ -5,13 +5,13 @@
 #include "config.h"
 #include <lvgl.h>
 #include <TFT_eSPI.h>
-#include "ui.h"
+#include "ui/ui.h"
 
 TFT_eSPI tft = TFT_eSPI();
 
 // Buffer
 static lv_disp_draw_buf_t draw_buf;
-static lv_color_t buf[320 * 20];
+static lv_color_t buf[480 * 20];
 
 int timer = SPRAY_DURATION / 1000; // Timer in seconds
 
@@ -112,7 +112,7 @@ void handleTimer(bool reset = false){
         t=millis();
 
         Serial.println("[TIMER] Timer tick: " + String(timer));
-        lv_label_set_text(ui_SerialNumberLabel, String(timer).c_str());
+        lv_label_set_text(ui_homeTimer, String(timer).c_str());
         timer--;
 
     }
@@ -717,7 +717,7 @@ void controlTask(void *pv)
                 Serial.println(F("[ERROR] Door opened during process - Emergency state"));
                 preFailure();
                 stateStartTime = millis();
-                lv_label_set_text(ui_SerialNumberLabel, "00");
+                lv_label_set_text(ui_homeTimer, "00");
                 lv_label_set_text(ui_homeNotification, "SYSTEM FAILURE !");
                 systemState = SYSTEM_FAILURE;
             }
@@ -731,7 +731,7 @@ void controlTask(void *pv)
                 if (current_mode == MODE_C) unlockDoor(additionalChannel); // For MODE C, unlock additional channel
         
                 Serial.println(F("[INFO] Spray duration completed"));
-                lv_label_set_text(ui_SerialNumberLabel, "00");
+                lv_label_set_text(ui_homeTimer, "00");
                 systemState = EXIT_OPEN;
             }
             handleRedLED(500);
@@ -861,23 +861,23 @@ void setup()
     pinMode(CH1_RED_LED,OUTPUT);
 
     tft.begin();
-    tft.setRotation(0);
+    tft.setRotation(1);
 
     // ADD THIS RIGHT HERE
-    uint16_t calData[5] = { 113, 3608, 212, 3684, 4 };
+    uint16_t calData[5] = { 249, 3661, 86, 3625, 7 };
     tft.setTouch(calData);
 
     lv_init();
 
     // Buffer init
-    lv_disp_draw_buf_init(&draw_buf, buf, NULL, 320 * 20);
+    lv_disp_draw_buf_init(&draw_buf, buf, NULL, 480 * 20);
 
     // Display driver
     static lv_disp_drv_t disp_drv;
     lv_disp_drv_init(&disp_drv);
 
-    disp_drv.hor_res = 320;
-    disp_drv.ver_res = 480;
+    disp_drv.hor_res = 480;
+    disp_drv.ver_res = 320;
     disp_drv.flush_cb = my_disp_flush;
     disp_drv.draw_buf = &draw_buf;
 
@@ -917,7 +917,7 @@ void loop()
             if (serialInputBuffer.length() > 0)
             {
                 // Update the label on screen
-                lv_label_set_text(ui_SerialNumberLabel, serialInputBuffer.c_str());
+                lv_label_set_text(ui_homeTimer, serialInputBuffer.c_str());
                 
                 Serial.print(F("[SERIAL] Number displayed: "));
                 Serial.println(serialInputBuffer);
@@ -931,7 +931,7 @@ void loop()
             serialInputBuffer += c;
             
             // Optional: Live preview while typing
-            // lv_label_set_text(ui_SerialNumberLabel, serialInputBuffer.c_str());
+            // lv_label_set_text(ui_homeTimer, serialInputBuffer.c_str());
         }
         else if (c == 'i')             // Handle backspace
         {
@@ -944,7 +944,7 @@ void loop()
         else if (c == 'c' || c == 'C')   // Clear command
         {
             serialInputBuffer = "";
-            lv_label_set_text(ui_SerialNumberLabel, "00");
+            lv_label_set_text(ui_homeTimer, "00");
             Serial.println(F("[SERIAL] Display cleared"));
         }
     }

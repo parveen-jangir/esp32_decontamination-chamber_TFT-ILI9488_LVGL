@@ -15,9 +15,11 @@ extern void ui_Screen1_screen_init(void);
 extern void ui_Screen1_screen_destroy(void);
 extern lv_obj_t * ui_Screen1;
 extern lv_obj_t * ui_time;
-extern lv_obj_t * ui_SerialNumberLabel;
+extern lv_obj_t * ui_homeTimer;
 extern lv_obj_t * ui_homeNotification;
 extern lv_obj_t * ui_date;
+extern void ui_event_Button3(lv_event_t * e);
+extern lv_obj_t * ui_Button3;
 // CUSTOM VARIABLES
 
 #ifdef __cplusplus
