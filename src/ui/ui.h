@@ -13,6 +13,8 @@ extern "C" {
 #include "lvgl.h"
 
 #include "ui_helpers.h"
+#include "ui_comp.h"
+#include "ui_comp_hook.h"
 #include "ui_events.h"
 
 
@@ -27,6 +29,9 @@ extern "C" {
 // EVENTS
 
 extern lv_obj_t * ui____initial_actions0;
+
+// IMAGES AND IMAGE SETS
+LV_IMG_DECLARE(ui_img_modeset_png);    // assets/modeSet.png
 
 // FONTS
 LV_FONT_DECLARE(ui_font_Montserrat150);
