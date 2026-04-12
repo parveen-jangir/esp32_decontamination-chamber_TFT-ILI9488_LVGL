@@ -19,6 +19,7 @@ lv_obj_t * ui_comp_get_child(lv_obj_t * comp, uint32_t child_idx);
 extern uint32_t LV_EVENT_GET_COMP_CHILD;
 #include "ui_comp_changescreen.h"
 #include "ui_comp_modselbtn.h"
+#include "ui_comp_settingwidget.h"
 
 #ifdef __cplusplus
 } /*extern "C"*/

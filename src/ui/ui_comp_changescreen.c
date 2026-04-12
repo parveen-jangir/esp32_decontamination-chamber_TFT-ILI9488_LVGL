@@ -5,6 +5,16 @@
 
 #include "ui.h"
 
+void ui_event_comp_changeScreen_changeScreen(lv_event_t * e)
+{
+    lv_event_code_t event_code = lv_event_get_code(e);
+    lv_obj_t ** comp_changeScreen = lv_event_get_user_data(e);
+
+    if(event_code == LV_EVENT_RELEASED) {
+        _ui_screen_change(&ui_Screen1, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Screen1_screen_init);
+    }
+}
+
 // COMPONENT changeScreen
 
 lv_obj_t * ui_changeScreen_create(lv_obj_t * comp_parent)
@@ -27,6 +37,7 @@ lv_obj_t * ui_changeScreen_create(lv_obj_t * comp_parent)
     children[UI_COMP_CHANGESCREEN_CHANGESCREEN] = cui_changeScreen;
     lv_obj_add_event_cb(cui_changeScreen, get_component_child_event_cb, LV_EVENT_GET_COMP_CHILD, children);
     lv_obj_add_event_cb(cui_changeScreen, del_component_child_event_cb, LV_EVENT_DELETE, children);
+    lv_obj_add_event_cb(cui_changeScreen, ui_event_comp_changeScreen_changeScreen, LV_EVENT_ALL, children);
     ui_comp_changeScreen_create_hook(cui_changeScreen);
     return cui_changeScreen;
 }

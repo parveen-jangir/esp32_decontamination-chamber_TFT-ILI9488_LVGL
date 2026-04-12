@@ -1,8 +1,11 @@
 SET(SOURCES ui_comp_changescreen.c
     ui_comp_modselbtn.c
+    ui_comp_settingwidget.c
     ui_comp.c
     ui_Screen1.c
     ui_Screen3.c
+    ui_Screen2.c
+    ui_Screen6.c
     ui_theme_manager.c
     ui_themes.c
     ui.c

@@ -12,3 +12,7 @@ void ui_comp_modSelBtn_create_hook(lv_obj_t * comp)
 void ui_comp_changeScreen_create_hook(lv_obj_t * comp)
 {
 }
+
+void ui_comp_settingWidget_create_hook(lv_obj_t * comp)
+{
+}

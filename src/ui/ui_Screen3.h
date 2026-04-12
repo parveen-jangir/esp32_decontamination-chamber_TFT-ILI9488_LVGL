@@ -41,6 +41,7 @@ extern void ui_event_changeScreen2(lv_event_t * e);
 extern lv_obj_t * ui_changeScreen2;
 extern lv_obj_t * ui_Image17;
 extern lv_obj_t * ui_Label4;
+extern lv_obj_t * ui_settingsLable2;
 // CUSTOM VARIABLES
 
 #ifdef __cplusplus

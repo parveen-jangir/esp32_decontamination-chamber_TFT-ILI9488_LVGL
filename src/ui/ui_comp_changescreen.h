@@ -16,6 +16,7 @@ extern "C" {
 #define UI_COMP_CHANGESCREEN_CHANGESCREEN 0
 #define _UI_COMP_CHANGESCREEN_NUM 1
 lv_obj_t * ui_changeScreen_create(lv_obj_t * comp_parent);
+void ui_event_comp_changeScreen_changeScreen(lv_event_t * e);
 
 #ifdef __cplusplus
 } /*extern "C"*/

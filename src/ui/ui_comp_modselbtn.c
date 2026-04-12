@@ -14,9 +14,9 @@ lv_obj_t * ui_modSelBtn_create(lv_obj_t * comp_parent)
     cui_modSelBtn = lv_btn_create(comp_parent);
     lv_obj_set_width(cui_modSelBtn, 141);
     lv_obj_set_height(cui_modSelBtn, 168);
-    lv_obj_set_x(cui_modSelBtn, 16);
-    lv_obj_set_y(cui_modSelBtn, 67);
-    lv_obj_add_flag(cui_modSelBtn, LV_OBJ_FLAG_SCROLL_ON_FOCUS);     /// Flags
+    lv_obj_set_x(cui_modSelBtn, 326);
+    lv_obj_set_y(cui_modSelBtn, 76);
+    lv_obj_add_flag(cui_modSelBtn, LV_OBJ_FLAG_CHECKABLE | LV_OBJ_FLAG_SCROLL_ON_FOCUS);     /// Flags
     lv_obj_clear_flag(cui_modSelBtn, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
     lv_obj_set_style_radius(cui_modSelBtn, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
     ui_object_set_themeable_style_property(cui_modSelBtn, LV_PART_MAIN | LV_STATE_DEFAULT, LV_STYLE_BG_COLOR,
