@@ -3,15 +3,19 @@
 // LVGL version: 8.3.11
 // Project name: SquareLine_Project
 
-#ifndef _SQUARELINE_PROJECT_UI_COMP_HOOK_H
-#define _SQUARELINE_PROJECT_UI_COMP_HOOK_H
+#ifndef _UI_COMP_CHANGESCREEN_H
+#define _UI_COMP_CHANGESCREEN_H
+
+#include "ui.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-void ui_comp_changeScreen_create_hook(lv_obj_t * comp);
-void ui_comp_modSelBtn_create_hook(lv_obj_t * comp);
+// COMPONENT changeScreen
+#define UI_COMP_CHANGESCREEN_CHANGESCREEN 0
+#define _UI_COMP_CHANGESCREEN_NUM 1
+lv_obj_t * ui_changeScreen_create(lv_obj_t * comp_parent);
 
 #ifdef __cplusplus
 } /*extern "C"*/

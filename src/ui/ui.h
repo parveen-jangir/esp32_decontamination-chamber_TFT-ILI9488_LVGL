@@ -16,12 +16,14 @@ extern "C" {
 #include "ui_comp.h"
 #include "ui_comp_hook.h"
 #include "ui_events.h"
+#include "ui_theme_manager.h"
+#include "ui_themes.h"
 
 
 ///////////////////// SCREENS ////////////////////
 
 #include "ui_Screen1.h"
-#include "ui_Screen2.h"
+#include "ui_Screen3.h"
 
 ///////////////////// VARIABLES ////////////////////
 
@@ -31,7 +33,9 @@ extern "C" {
 extern lv_obj_t * ui____initial_actions0;
 
 // IMAGES AND IMAGE SETS
-LV_IMG_DECLARE(ui_img_modeset_png);    // assets/modeSet.png
+LV_IMG_DECLARE(ui_img_image_2_png);    // assets/image 2.png
+LV_IMG_DECLARE(ui_img_arrow_3_png);    // assets/Arrow 3.png
+LV_IMG_DECLARE(ui_img_image_8_png);    // assets/image 8.png
 
 // FONTS
 LV_FONT_DECLARE(ui_font_Montserrat150);
